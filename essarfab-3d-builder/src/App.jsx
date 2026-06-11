@@ -25,11 +25,19 @@ function Panel({ position, rotation = [0, 0, 0], size }) {
             ]}
           >
             <boxGeometry args={[0.03, size[1], 0.01]} />
-            <meshStandardMaterial color="#1f6e43" />
+            <meshStandardMaterial color="#0b5d3b" />
           </mesh>
         )
       )}
     </group>
+  );
+}
+function CornerTrim({ position, height }) {
+  return (
+    <mesh position={position}>
+      <boxGeometry args={[0.1, height, 0.1]} />
+      <meshStandardMaterial color="#0b5d3b" />
+    </mesh>
   );
 }
 
@@ -103,18 +111,18 @@ export default function App() {
           />
         </div>
         <div>
-  Panel Thickness:
-  <select
-    value={panelThickness}
-    onChange={(e) => setPanelThickness(Number(e.target.value))}
-  >
-    <option value={60}>60 mm</option>
-    <option value={80}>80 mm</option>
-    <option value={100}>100 mm</option>
-    <option value={120}>120 mm</option>
-    <option value={150}>150 mm</option>
-  </select>
-</div>
+          Panel Thickness:
+          <select
+            value={panelThickness}
+            onChange={(e) => setPanelThickness(Number(e.target.value))}
+          >
+            <option value={60}>60 mm</option>
+            <option value={80}>80 mm</option>
+            <option value={100}>100 mm</option>
+            <option value={120}>120 mm</option>
+            <option value={150}>150 mm</option>
+          </select>
+        </div>
 
         <hr />
 
@@ -162,6 +170,29 @@ export default function App() {
           position={[0, height, 0]}
           rotation={[Math.PI / 2, 0, 0]}
           size={[length, width, thickness]}
+        />
+        {/* Front Left Corner */}
+        <CornerTrim
+          position={[-length / 2, height / 2, width / 2]}
+          height={height}
+        />
+
+        {/* Front Right Corner */}
+        <CornerTrim
+          position={[length / 2, height / 2, width / 2]}
+          height={height}
+        />
+
+        {/* Back Left Corner */}
+        <CornerTrim
+          position={[-length / 2, height / 2, -width / 2]}
+          height={height}
+        />
+
+        {/* Back Right Corner */}
+        <CornerTrim
+          position={[length / 2, height / 2, -width / 2]}
+          height={height}
         />
 
         {/* Door */}
