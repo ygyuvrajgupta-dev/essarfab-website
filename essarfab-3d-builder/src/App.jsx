@@ -1,46 +1,15 @@
-import { useState } from "react";
+import { useState } from "react";                                                       //cd essarfab-3d-builder
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid } from "@react-three/drei";
-
-function Panel({ position, rotation = [0, 0, 0], size }) {
-  return (
-    <group position={position} rotation={rotation}>
-
-      {/* Main panel */}
-      <mesh>
-        <boxGeometry args={size} />
-        <meshStandardMaterial color="#f5f5f5" />
-      </mesh>
-
-      {/* Vertical joint lines */}
-      {Array.from(
-        { length: Math.floor(size[0] / 1.2) },
-        (_, i) => (
-          <mesh
-            key={i}
-            position={[
-              -size[0] / 2 + (i + 1) * 1.2,
-              0,
-              size[2] / 2 + 0.001
-            ]}
-          >
-            <boxGeometry args={[0.03, size[1], 0.01]} />
-            <meshStandardMaterial color="#0b5d3b" />
-          </mesh>
-        )
-      )}
-    </group>
-  );
-}
-function CornerTrim({ position, height }) {
-  return (
-    <mesh position={position}>
-      <boxGeometry args={[0.1, height, 0.1]} />
-      <meshStandardMaterial color="#0b5d3b" />
-    </mesh>
-  );
-}
-
+import { useTexture } from "@react-three/drei";
+import {
+  OrbitControls,
+  Grid,
+  Environment,
+  Bounds
+} from "@react-three/drei";
+import Panel from "./components/Panel";
+import CornerTrim from "./components/CornerTrim";
+import Door from "./components/Door";
 export default function App() {
   const [length, setLength] = useState(10);
   const [width, setWidth] = useState(8);
@@ -132,75 +101,106 @@ export default function App() {
         <p>Selected Thickness: {panelThickness} mm</p>
       </div>
 
-      <Canvas camera={{ position: [15, 10, 15], fov: 50 }}>
-        <ambientLight intensity={3} />
-        <directionalLight position={[10, 10, 10]} intensity={5} />
+      <Canvas
+  shadows
+  camera={{ position: [16, 10, 16], fov: 40 }}
+>
+  {/* Sky Background */}
+  <color attach="background" args={["#9fd3ff"]} />
 
-        <OrbitControls />
-        <Grid infiniteGrid />
+  {/* Lights */}
+  <ambientLight intensity={0.7} />
 
-        {/* Front */}
-        <Panel
-          position={[0, height / 2, width / 2]}
-          size={[length, height, thickness]}
-        />
+  <directionalLight
+    position={[20, 20, 20]}
+    intensity={2.5}
+    castShadow
+    shadow-mapSize-width={2048}
+    shadow-mapSize-height={2048}
+  />
 
-        {/* Back */}
-        <Panel
-          position={[0, height / 2, -width / 2]}
-          size={[length, height, thickness]}
-        />
+  <directionalLight
+    position={[-20, 10, -20]}
+    intensity={0.8}
+  />
 
-        {/* Left */}
-        <Panel
-          position={[-length / 2, height / 2, 0]}
-          rotation={[0, Math.PI / 2, 0]}
-          size={[width, height, thickness]}
-        />
+  {/* Environment */}
+  <Environment preset="sunset" />
 
-        {/* Right */}
-        <Panel
-          position={[length / 2, height / 2, 0]}
-          rotation={[0, Math.PI / 2, 0]}
-          size={[width, height, thickness]}
-        />
+  {/* Controls */}
+  <OrbitControls
+    makeDefault
+    target={[0, height / 2, 0]}
+    minDistance={5}
+    maxDistance={50}
+    maxPolarAngle={Math.PI / 2.1}
+  />
 
-        {/* Roof */}
-        <Panel
-          position={[0, height, 0]}
-          rotation={[Math.PI / 2, 0, 0]}
-          size={[length, width, thickness]}
-        />
-        {/* Front Left Corner */}
-        <CornerTrim
-          position={[-length / 2, height / 2, width / 2]}
-          height={height}
-        />
+  {/* Grid */}
+  <Grid infiniteGrid />
 
-        {/* Front Right Corner */}
-        <CornerTrim
-          position={[length / 2, height / 2, width / 2]}
-          height={height}
-        />
+  {/* Front Wall */}
+  <Panel
+    position={[0, height / 2, width / 2]}
+    size={[length, height, thickness]}
+  />
 
-        {/* Back Left Corner */}
-        <CornerTrim
-          position={[-length / 2, height / 2, -width / 2]}
-          height={height}
-        />
+  {/* Back Wall */}
+  <Panel
+    position={[0, height / 2, -width / 2]}
+    size={[length, height, thickness]}
+  />
 
-        {/* Back Right Corner */}
-        <CornerTrim
-          position={[length / 2, height / 2, -width / 2]}
-          height={height}
-        />
+  {/* Left Wall */}
+  <Panel
+    position={[-length / 2, height / 2, 0]}
+    rotation={[0, Math.PI / 2, 0]}
+    size={[width, height, thickness]}
+  />
 
-        {/* Door */}
-        <mesh position={[0, 1.2, width / 2 + 0.08]}>
-          <boxGeometry args={[1.2, 2.4, 0.1]} />
-          <meshStandardMaterial color="#cccccc" />
-        </mesh>
-      </Canvas>
+  {/* Right Wall */}
+  <Panel
+    position={[length / 2, height / 2, 0]}
+    rotation={[0, Math.PI / 2, 0]}
+    size={[width, height, thickness]}
+  />
+
+  {/* Roof */}
+  <Panel
+    position={[0, height, 0]}
+    rotation={[Math.PI / 2, 0, 0]}
+    size={[length, width, thickness]}
+  />
+
+  {/* Corner Trims */}
+
+  {/* Front Left */}
+  <CornerTrim
+    position={[-length / 2, height / 2, width / 2]}
+    height={height}
+  />
+
+  {/* Front Right */}
+  <CornerTrim
+    position={[length / 2, height / 2, width / 2]}
+    height={height}
+  />
+
+  {/* Back Left */}
+  <CornerTrim
+    position={[-length / 2, height / 2, -width / 2]}
+    height={height}
+  />
+
+  {/* Back Right */}
+  <CornerTrim
+    position={[length / 2, height / 2, -width / 2]}
+    height={height}
+  />
+
+  {/* Door */}
+  <Door width={width} />
+</Canvas>
     </>
   );
 }
