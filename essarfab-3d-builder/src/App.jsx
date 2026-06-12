@@ -1,11 +1,9 @@
 import { useState } from "react";                                                       //cd essarfab-3d-builder
 import { Canvas } from "@react-three/fiber";
-import { useTexture } from "@react-three/drei";
 import {
   OrbitControls,
   Grid,
   Environment,
-  Bounds
 } from "@react-three/drei";
 import Panel from "./components/Panel";
 import CornerTrim from "./components/CornerTrim";
