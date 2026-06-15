@@ -42,8 +42,13 @@
   <meta name="twitter:image" content="https://essarfabgreenindia.com/twitter-image.jpeg">
   <meta name="twitter:image:alt" content="ESSARFAB GREEN INDIA PUF Panels">
 
+  <!-- Favicon — all formats for maximum browser & Google support -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <meta name="msapplication-TileImage" content="/apple-touch-icon.png">
+  <meta name="theme-color" content="#0d5438">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -60,7 +65,12 @@
         "@id": "https://essarfabgreenindia.com/#organization",
         "name": "ESSARFAB GREEN INDIA PVT LTD",
         "url": "https://essarfabgreenindia.com/",
-        "logo": { "@type": "ImageObject", "url": "https://essarfabgreenindia.com/Essarfab%20logo.png" },
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://essarfabgreenindia.com/Essarfab%20logo.png",
+          "width": 512,
+          "height": 512
+        },
         "description": "India's leading manufacturer of PUF/PIR insulated panels, cold storage solutions, cleanrooms and insulated doors.",
         "foundingDate": "1995",
         "numberOfEmployees": { "@type": "QuantitativeValue", "value": 80 },
@@ -116,9 +126,24 @@
               "@type": "Product",
               "name": "PUF Sandwich Panel (PUR/PIR)",
               "description": "High-density PUF/PUFF sandwich panels for walls, roofs and partitions. Thickness 30mm–150mm, density 40±2 kg/m³, thermal conductivity λ=0.021 W/mK, fire-retardant, CFC-free. Ideal for cold storage, warehouse insulation and cleanrooms.",
+              "url": "https://essarfabgreenindia.com/#products",
+              "image": "https://essarfabgreenindia.com/og-image.jpeg",
+              "sku": "EF-PUF-001",
               "brand": { "@type": "Brand", "name": "ESSARFAB GREEN INDIA" },
               "manufacturer": { "@id": "https://essarfabgreenindia.com/#organization" },
-              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "priceCurrency": "INR", "seller": { "@id": "https://essarfabgreenindia.com/#organization" } }
+              "offers": {
+                "@type": "Offer",
+                "url": "https://essarfabgreenindia.com/#contact",
+                "availability": "https://schema.org/InStock",
+                "priceCurrency": "INR",
+                "price": "0",
+                "priceSpecification": {
+                  "@type": "PriceSpecification",
+                  "priceCurrency": "INR",
+                  "description": "Price on request — contact for best factory price"
+                },
+                "seller": { "@id": "https://essarfabgreenindia.com/#organization" }
+              }
             }
           },
           {
@@ -127,9 +152,24 @@
               "@type": "Product",
               "name": "Cold Storage & Cold Room Solution",
               "description": "Turnkey cold room and cold storage construction using PUF insulated panels. Banana ripening chambers, potato cold stores, pharma cold rooms, multi-commodity warehouses. Pan-India installation.",
+              "url": "https://essarfabgreenindia.com/#products",
+              "image": "https://essarfabgreenindia.com/og-image.jpeg",
+              "sku": "EF-CS-002",
               "brand": { "@type": "Brand", "name": "ESSARFAB GREEN INDIA" },
               "manufacturer": { "@id": "https://essarfabgreenindia.com/#organization" },
-              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "priceCurrency": "INR", "seller": { "@id": "https://essarfabgreenindia.com/#organization" } }
+              "offers": {
+                "@type": "Offer",
+                "url": "https://essarfabgreenindia.com/#contact",
+                "availability": "https://schema.org/InStock",
+                "priceCurrency": "INR",
+                "price": "0",
+                "priceSpecification": {
+                  "@type": "PriceSpecification",
+                  "priceCurrency": "INR",
+                  "description": "Price on request — contact for project quote"
+                },
+                "seller": { "@id": "https://essarfabgreenindia.com/#organization" }
+              }
             }
           },
           {
@@ -138,9 +178,24 @@
               "@type": "Product",
               "name": "Insulated Warehouse Panel",
               "description": "PUF/PIR insulated sandwich panels for warehouse roofing and walls. High thermal efficiency, weather resistant, fast modular assembly with cam-lock joints.",
+              "url": "https://essarfabgreenindia.com/#products",
+              "image": "https://essarfabgreenindia.com/og-image.jpeg",
+              "sku": "EF-WH-003",
               "brand": { "@type": "Brand", "name": "ESSARFAB GREEN INDIA" },
               "manufacturer": { "@id": "https://essarfabgreenindia.com/#organization" },
-              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "priceCurrency": "INR", "seller": { "@id": "https://essarfabgreenindia.com/#organization" } }
+              "offers": {
+                "@type": "Offer",
+                "url": "https://essarfabgreenindia.com/#contact",
+                "availability": "https://schema.org/InStock",
+                "priceCurrency": "INR",
+                "price": "0",
+                "priceSpecification": {
+                  "@type": "PriceSpecification",
+                  "priceCurrency": "INR",
+                  "description": "Price on request — contact for project quote"
+                },
+                "seller": { "@id": "https://essarfabgreenindia.com/#organization" }
+              }
             }
           },
           {
@@ -149,9 +204,24 @@
               "@type": "Product",
               "name": "PUF Pipe Section Insulation",
               "description": "Pre-formed rigid PUF foam pipe sections for HVAC, ammonia lines and chilled water pipelines. Operating range -200°C to +110°C, closed cell content ≥90%.",
+              "url": "https://essarfabgreenindia.com/#products",
+              "image": "https://essarfabgreenindia.com/og-image.jpeg",
+              "sku": "EF-PS-004",
               "brand": { "@type": "Brand", "name": "ESSARFAB GREEN INDIA" },
               "manufacturer": { "@id": "https://essarfabgreenindia.com/#organization" },
-              "offers": { "@type": "Offer", "availability": "https://schema.org/InStock", "priceCurrency": "INR", "seller": { "@id": "https://essarfabgreenindia.com/#organization" } }
+              "offers": {
+                "@type": "Offer",
+                "url": "https://essarfabgreenindia.com/#contact",
+                "availability": "https://schema.org/InStock",
+                "priceCurrency": "INR",
+                "price": "0",
+                "priceSpecification": {
+                  "@type": "PriceSpecification",
+                  "priceCurrency": "INR",
+                  "description": "Price on request — contact for project quote"
+                },
+                "seller": { "@id": "https://essarfabgreenindia.com/#organization" }
+              }
             }
           }
         ]
