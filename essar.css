@@ -163,122 +163,8 @@ nav[aria-label="3D Builder App"] {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* Unordered list - horizontal flex layout */
-.app-nav-links {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 2rem;                     /* Space between links */
-  margin: 0;
-  padding: 0;
-  list-style: none;              /* Remove bullet points */
-}
 
-/* List items - no extra styling needed, but ensures block behaviour */
-.app-nav-links li {
-  margin: 0;
-  padding: 0;
-}
-
-/* Anchor (link) styling */
-.app-nav-links a {
-  color: #ffffff;
-  text-decoration: none;
-  font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-  font-size: 1rem;
-  font-weight: 500;
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
-  transition: all 0.2s ease-in-out;
-  display: inline-block;
-}
-
-/* Hover effect */
-.app-nav-links a:hover {
-  background-color: rgba(255, 255, 255, 0.15);
-  color: #ffd966;
-  transform: translateY(-1px);
-}
-
-/* Active / focus state for accessibility */
-.app-nav-links a:focus {
-  outline: 2px solid #ffb347;
-  outline-offset: 2px;
-  background-color: rgba(255, 180, 71, 0.2);
-}
-
-/* Optional: special styling for external link (opens in new tab) */
-.app-nav-links a[target="_blank"]::after {
-  content: " ↗";
-  font-size: 0.85rem;
-  font-weight: normal;
-  opacity: 0.7;
-}
-
-/* Responsive: stack vertically on small screens */
-@media (max-width: 640px) {
-  .app-nav-links {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-  }
-  
-  .app-nav-links a {
-    text-align: center;
-    padding: 0.75rem;
-  }
-  
-  nav[aria-label="3D Builder App"] {
-    padding: 1rem;
-  }
-}
-/* This CSS ONLY affects the "3D Builder App" navigation – no other nav links on your page */
-
-nav[aria-label="3D Builder App"] {
-  /* Isolate from other navs – no unexpected inheritance */
-  all: revert; /* Resets any inherited nav styles, then apply below */
-  display: block;
-}
-
-.app-nav-links {
-  /* Reset list styles – won't affect other ULs outside this selector */
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  gap: 1.5rem;
-  align-items: center;
-}
-
-.app-nav-links li {
-  margin: 0;
-  padding: 0;
-}
-
-.app-nav-links a {
-  display: inline-block;
-  text-decoration: none;
-  font-family: inherit;
-  font-size: 1rem;
-  font-weight: 500;
-  color: #3b82f6;           /* example: friendly blue */
-  background-color: transparent;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  transition: background-color 0.2s ease;
-}
-
-/* Optional hover effect – only for this nav */
-.app-nav-links a:hover {
-  background-color: #eff6ff;
-  color: #2563eb;
-}
-
-/* Make sure the link has visible text – add this if your <a> is empty */
-.app-nav-links a::before {
-  content: "React App";   /* or "3D Builder" – change to your label */
-  display: inline-block;
-}
+/* ── Nav links ────────────────────────────────────────── */
 .nav-links {
   display: flex;
   gap: 0.25rem;
@@ -311,6 +197,33 @@ nav[aria-label="3D Builder App"] {
   box-shadow: 0 6px 20px rgba(13,84,56,0.45);
   transform: translateY(-1px);
 }
+
+/* nav divider — vertical line between Get Quote and 3D Model */
+.nav-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  margin: 0 0.6rem;
+  flex-shrink: 0;
+}
+
+/* 3D Model nav link */
+.nav-link.nav-3d {
+  color: var(--g600) !important;
+  font-weight: 700;
+  border: 1.5px solid var(--g100);
+  border-radius: 50px;
+  padding: 0.4rem 1rem;
+  background: var(--g50);
+  transition: background var(--t), border-color var(--t), color var(--t), transform 0.2s;
+}
+.nav-link.nav-3d:hover {
+  background: var(--g600);
+  color: var(--white) !important;
+  border-color: var(--g600);
+  transform: translateY(-1px);
+}
+.nav-link.nav-3d::after { display: none; }
 
 /* hamburger */
 .mobile-menu-btn {
@@ -1642,6 +1555,7 @@ footer {
     text-align: center;
     justify-content: center;
   }
+  .nav-divider { display: none; }
   .nav-container { position: relative; }
   .mobile-menu-btn { display: flex; }
 
