@@ -225,10 +225,9 @@ a { color: inherit; }
 .hero-bg-overlay {
   position: absolute;
   inset: 0;
-  background:
-    url('https://images.unsplash.com/photo-1581094651181-35942459ef62?w=1400&auto=format&fit=crop&q=60')
-    center / cover no-repeat;
-  opacity: 0.12;
+  background: url('essar factory.png') center / cover no-repeat;
+  opacity: 0.18;
+  filter: grayscale(20%);
 }
 
 /* particles */
@@ -1172,6 +1171,59 @@ footer {
 /* hide on small screens */
 @media (max-width: 900px) {
   .hero-social { display: none; }
+}
+
+/* ══════════════════════════════════════════════════════
+   HERO SOCIAL — MOBILE ROW (≤900px only)
+══════════════════════════════════════════════════════ */
+.hero-social-mobile {
+  display: none; /* hidden on desktop */
+}
+
+@media (max-width: 900px) {
+  .hero-social-mobile {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 5;
+    padding: 0 28px;
+    margin-top: 1.8rem;
+    margin-bottom: -1rem; /* tucks under the wave */
+  }
+
+  .hero-social-mobile span {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    margin-right: 0.2rem;
+  }
+
+  .hero-social-mobile a {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.65);
+    font-size: 0.88rem;
+    text-decoration: none;
+    transition: background var(--t), color var(--t), border-color var(--t), transform 0.2s;
+  }
+
+  .hero-social-mobile a:active { transform: scale(0.9); }
+
+  .hero-social-mobile a[aria-label="Instagram"]:hover  { background: linear-gradient(45deg,#f09433,#dc2743,#bc1888); border-color:transparent; color:#fff; }
+  .hero-social-mobile a[aria-label="Facebook"]:hover   { background: #1877f2; border-color:transparent; color:#fff; }
+  .hero-social-mobile a[aria-label="LinkedIn"]:hover   { background: #0a66c2; border-color:transparent; color:#fff; }
+  .hero-social-mobile a[aria-label="X (Twitter)"]:hover { background: #111;   border-color:transparent; color:#fff; }
+  .hero-social-mobile a[aria-label="Meta"]:hover       { background: #0082fb; border-color:transparent; color:#fff; }
 }
 
 /* ══════════════════════════════════════════════════════
