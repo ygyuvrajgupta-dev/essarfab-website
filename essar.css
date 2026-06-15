@@ -140,7 +140,7 @@ a { color: inherit; }
 .logo a { text-decoration: none; display: flex; align-items: center; }
 .logo-img {
   height: 52px;
-  width: auto;
+  width: 60px;
   object-fit: contain;
   filter: brightness(0) saturate(100%)
           invert(20%) sepia(70%) saturate(600%)
@@ -401,7 +401,56 @@ a { color: inherit; }
 }
 
 /* ── Hero card ────────────────────────────────────────── */
-.hero-card-wrap { display: flex; justify-content: center; }
+.hero-card-wrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* label above the card */
+.hero-card-label {
+  text-align: center;
+  font-family: 'Poppins', sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--g400);
+  margin-bottom: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  transition: color 0.4s ease;
+  cursor: default;
+}
+
+.hero-card-label::before,
+.hero-card-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  transition: background 0.4s ease;
+}
+.hero-card-label::before {
+  background: linear-gradient(to right, transparent, rgba(62,196,126,0.45));
+}
+.hero-card-label::after {
+  background: linear-gradient(to left, transparent, rgba(62,196,126,0.45));
+}
+
+.hero-card-wrap:hover .hero-card-label {
+  color: var(--white);
+}
+.hero-card-wrap:hover .hero-card-label::before {
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.35));
+}
+.hero-card-wrap:hover .hero-card-label::after {
+  background: linear-gradient(to left, transparent, rgba(255,255,255,0.35));
+}
+
+/* mobile company label — hidden on desktop, shown on mobile */
+.hero-company-label-mobile { display: none; }
 
 .hero-card {
   background: linear-gradient(160deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
@@ -1053,6 +1102,92 @@ footer {
 }
 
 /* ══════════════════════════════════════════════════════
+   FAQ SECTION
+══════════════════════════════════════════════════════ */
+.faq-section {
+  background: var(--light);
+  padding: 6rem 0;
+}
+.faq-section .section-label,
+.faq-section .section-title,
+.faq-section .section-sub { display: block; text-align: center; margin-left: auto; margin-right: auto; }
+
+.faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.faq-item {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  transition: box-shadow var(--t), border-color var(--t);
+}
+.faq-item:hover {
+  box-shadow: var(--sh-md);
+  border-color: var(--g100);
+}
+.faq-item[open] {
+  border-color: var(--g600);
+  box-shadow: 0 0 0 3px rgba(22,122,78,0.08);
+}
+
+.faq-item summary {
+  cursor: pointer;
+  padding: 1.2rem 1.4rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--dark);
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  user-select: none;
+  transition: color var(--t), background var(--t);
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after {
+  content: '\f067'; /* fa-plus */
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  font-size: 0.75rem;
+  color: var(--g600);
+  flex-shrink: 0;
+  transition: transform var(--t);
+}
+.faq-item[open] summary::after {
+  content: '\f068'; /* fa-minus */
+  transform: rotate(0deg);
+}
+.faq-item[open] summary {
+  color: var(--g700);
+  background: var(--g50);
+}
+
+.faq-item > p {
+  padding: 0 1.4rem 1.4rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.7;
+  border-top: 1px solid var(--border);
+}
+.faq-item > p a {
+  color: var(--g600);
+  font-weight: 600;
+  text-decoration: none;
+}
+.faq-item > p a:hover { text-decoration: underline; }
+.faq-item > p strong { color: var(--dark); }
+
+@media (max-width: 700px) {
+  .faq-grid { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════════════
    HERO SOCIAL SIDEBAR
 ══════════════════════════════════════════════════════ */
 .hero-social {
@@ -1313,6 +1448,31 @@ footer {
   .hero-grid { grid-template-columns: 1fr; gap: 3rem; }
   .hero-card-wrap { display: none; }
   .hero-title { font-size: 2.6rem; }
+
+  .hero-company-label-mobile {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--g400);
+    margin-bottom: 0.8rem;
+  }
+  .hero-company-label-mobile::before,
+  .hero-company-label-mobile::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+  }
+  .hero-company-label-mobile::before {
+    background: linear-gradient(to right, transparent, rgba(62,196,126,0.4));
+  }
+  .hero-company-label-mobile::after {
+    background: linear-gradient(to left, transparent, rgba(62,196,126,0.4));
+  }
 
   .about-grid { grid-template-columns: 1fr; gap: 3rem; }
   .about-photo-main { height: 300px; }
