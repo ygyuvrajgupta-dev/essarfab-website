@@ -1,0 +1,190 @@
+/* ===== GOOGLE FONT ===== */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Poppins', sans-serif;
+}
+
+body {
+    background: #f7f9fb;
+    color: #333;
+    line-height: 1.8;
+}
+
+/* HERO SECTION */
+
+.hero {
+    background: linear-gradient(135deg, #0b5d3b, #00a651);
+    color: white;
+    padding: 80px 10%;
+    text-align: center;
+}
+
+.hero h1 {
+    font-size: 48px;
+    margin-bottom: 20px;
+    font-weight: 700;
+}
+
+.hero p {
+    max-width: 850px;
+    margin: auto;
+    font-size: 18px;
+}
+
+/* IMAGE SECTION */
+
+.product-image-section {
+    text-align: center;
+    padding: 50px 20px;
+}
+
+.product-image {
+    width: 100%;
+    max-width: 900px;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+/* CONTENT */
+
+.content-section {
+    background: white;
+    margin: 30px auto;
+    width: 90%;
+    max-width: 1200px;
+    padding: 40px;
+    border-radius: 18px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.content-section h2 {
+    color: #0b5d3b;
+    margin-bottom: 20px;
+    font-size: 32px;
+}
+
+.content-section p {
+    font-size: 17px;
+}
+
+.content-section ul {
+    margin-top: 15px;
+    padding-left: 25px;
+}
+
+.content-section li {
+    margin-bottom: 10px;
+}
+
+/* TABLE */
+
+.spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 25px;
+}
+
+.spec-table th {
+    background: #0b5d3b;
+    color: white;
+    padding: 15px;
+}
+
+.spec-table td {
+    padding: 15px;
+    border: 1px solid #ddd;
+}
+
+.spec-table tr:nth-child(even) {
+    background: #f3f3f3;
+}
+
+/* CTA SECTION */
+
+.cta-section {
+    background: #0b5d3b;
+    color: white;
+    text-align: center;
+    padding: 70px 20px;
+    margin-top: 60px;
+}
+
+.cta-section h2 {
+    font-size: 38px;
+    margin-bottom: 20px;
+}
+
+.cta-section p {
+    margin-bottom: 30px;
+}
+
+/* BUTTON */
+
+.btn {
+    display: inline-block;
+    background: white;
+    color: #0b5d3b;
+    text-decoration: none;
+    padding: 14px 35px;
+    border-radius: 50px;
+    font-weight: 600;
+    transition: 0.3s;
+}
+
+.btn:hover {
+    background: #00a651;
+    color: white;
+}
+
+/* RESPONSIVE */
+
+@media(max-width:768px) {
+
+    .hero h1 {
+        font-size: 34px;
+    }
+
+    .content-section {
+        padding: 25px;
+    }
+
+    .content-section h2 {
+        font-size: 26px;
+    }
+
+    .cta-section h2 {
+        font-size: 30px;
+    }
+
+    /* Fade Animation */
+
+    .content-section {
+        opacity: 0;
+        transform: translateY(40px);
+        transition: 0.8s ease;
+    }
+
+    .content-section.show {
+        opacity: 1;
+        transform: translateY(0px);
+    }
+
+
+    /* Button Animation */
+
+    .btn {
+        transition: 0.3s ease;
+    }
+
+
+    /* Smooth Page Scroll */
+
+    html {
+        scroll-behavior: smooth;
+    }
+
+}
