@@ -228,7 +228,7 @@ export default function App() {
           <div className="brand">
             <div className="brand-logo">ESSARFAB</div>
             <div className="brand-subtitle">PUF Panel Calculator &amp; 3D Builder</div>
-            <a className="back-link" href="../index.html">← Back to Website</a>
+            <a className="back-link" href="../../index.html">← Back to Website</a>
           </div>
 
           {/* Step Indicator */}
