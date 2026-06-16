@@ -11,6 +11,13 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
 
   const colorName  = COLOR_OPTIONS?.find(c => c.hex === config.panelColor)?.name || config.panelColor;
   const structName = STRUCTURE_TYPES?.find(s => s.value === config.structureType)?.label || config.structureType;
+  const unit = config.unit || "m";
+  const du = unit === "m" ? "m" : "ft";
+  const au = unit === "m" ? "m²" : "sq.ft";
+
+  const displayL = config.displayLength ?? config.length;
+  const displayW = config.displayWidth ?? config.width;
+  const displayH = config.displayHeight ?? config.height;
 
   const handleCopy = () => {
     const lines = [
@@ -20,7 +27,7 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
       "════════════════════════════════════════",
       "",
       `Project Type     : ${structName}`,
-      `Dimensions       : ${config.length}m (L) × ${config.width}m (W) × ${config.height}m (H)`,
+      `Dimensions       : ${displayL}${du} (L) × ${displayW}${du} (W) × ${displayH}${du} (H)`,
       `Panel Thickness  : ${config.panelThickness} mm`,
       `Panel Width Std  : ${config.panelWidthMM} mm`,
       `Panel Color      : ${colorName}`,
@@ -28,21 +35,21 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
       "",
       "── Outer Walls ──────────────────────────",
       ...calc.wallRows.map(w =>
-        `${w.label.padEnd(14)} | Gross: ${w.grossArea.toFixed(2).padStart(6)} m² | Deduct: ${w.openingDeduction.toFixed(2).padStart(5)} m² | Net: ${w.netArea.toFixed(2).padStart(6)} m² | Panels: ${w.panelCount}`
+        `${w.label.padEnd(14)} | Gross: ${w.grossArea.toFixed(2).padStart(6)} ${au} | Deduct: ${w.openingDeduction.toFixed(2).padStart(5)} ${au} | Net: ${w.netArea.toFixed(2).padStart(6)} ${au} | Panels: ${w.panelCount}`
       ),
       "",
-      `Roof             | Area:  ${calc.roofArea.toFixed(2)} m² | Panels: ${calc.roofPanelCount}`,
+      `Roof             | Area:  ${calc.roofArea.toFixed(2)} ${au} | Panels: ${calc.roofPanelCount}`,
       "",
       ...(calc.partitionRows.length > 0 ? [
         "── Partitions ───────────────────────────",
         ...calc.partitionRows.map(p =>
-          `${(p.label).padEnd(14)} | Gross: ${p.grossArea.toFixed(2).padStart(6)} m² | Net: ${p.netArea.toFixed(2).padStart(6)} m² | Panels: ${p.panelCount}`
+          `${(p.label).padEnd(14)} | Gross: ${p.grossArea.toFixed(2).padStart(6)} ${au} | Net: ${p.netArea.toFixed(2).padStart(6)} ${au} | Panels: ${p.panelCount}`
         ),
         "",
       ] : []),
       "── Summary ──────────────────────────────",
       `Total Panels     : ${calc.totalPanels}`,
-      `Total Panel Area : ${calc.totalArea.toFixed(2)} m²`,
+      `Total Panel Area : ${calc.totalArea.toFixed(2)} ${au}`,
       `Estimated Weight : ${calc.weight.toFixed(0)} kg`,
       "",
       "════════════════════════════════════════",
@@ -77,8 +84,8 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
             <table className="quote-table">
               <tbody>
                 <tr><td>Project Type</td><td>{structName}</td></tr>
-                <tr><td>Dimensions (L × W × H)</td><td>{config.length}m × {config.width}m × {config.height}m</td></tr>
-                <tr><td>Floor Area</td><td>{(config.length * config.width).toFixed(2)} m²</td></tr>
+                <tr><td>Dimensions (L × W × H)</td><td>{displayL}{du} × {displayW}{du} × {displayH}{du}</td></tr>
+                <tr><td>Floor Area</td><td>{(config.length * config.width).toFixed(2)} m² {unit === "ft" ? `/ ${(displayL * displayW).toFixed(2)} sq.ft` : ""}</td></tr>
                 <tr><td>Panel Thickness</td><td>{config.panelThickness} mm</td></tr>
                 <tr><td>Standard Panel Width</td><td>{config.panelWidthMM} mm</td></tr>
                 <tr>
@@ -98,7 +105,7 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
             <h4>Outer Wall Panels</h4>
             <table className="quote-table">
               <thead>
-                <tr><th>Wall</th><th>Gross m²</th><th>Deduct m²</th><th>Net m²</th><th>Panels</th></tr>
+                <tr><th>Wall</th><th>Gross {au}</th><th>Deduct {au}</th><th>Net {au}</th><th>Panels</th></tr>
               </thead>
               <tbody>
                 {calc.wallRows.map(w => (
@@ -129,7 +136,7 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
               <h4>Internal Partition Panels</h4>
               <table className="quote-table">
                 <thead>
-                  <tr><th>Partition</th><th>Gross m²</th><th>Deduct m²</th><th>Net m²</th><th>Panels</th></tr>
+                  <tr><th>Partition</th><th>Gross {au}</th><th>Deduct {au}</th><th>Net {au}</th><th>Panels</th></tr>
                 </thead>
                 <tbody>
                   {calc.partitionRows.map((p, i) => (
@@ -158,8 +165,8 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
                       <td>{o.label}</td>
                       <td style={{textTransform:"capitalize"}}>{o.type}</td>
                       <td style={{textTransform:"capitalize"}}>{o.wall}</td>
-                      <td>{o.width}m × {o.height}m</td>
-                      <td><span className="deduct">-{((parseFloat(o.width)||0)*(parseFloat(o.height)||0)).toFixed(2)} m²</span></td>
+                      <td>{o.width}{du} × {o.height}{du}</td>
+                      <td><span className="deduct">-{((parseFloat(o.width)||0)*(parseFloat(o.height)||0)).toFixed(2)} {au}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -173,7 +180,7 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
             <table className="quote-table">
               <tbody>
                 <tr><td>Total PUF Panels Required</td><td><strong style={{color:"var(--accent)",fontSize:"16px"}}>{calc.totalPanels} panels</strong></td></tr>
-                <tr><td>Total Panel Area</td><td><strong>{calc.totalArea.toFixed(2)} m²</strong></td></tr>
+                <tr><td>Total Panel Area</td><td><strong>{calc.totalArea.toFixed(2)} {au}</strong></td></tr>
                 <tr><td>Estimated Panel Weight</td><td>{calc.weight.toFixed(0)} kg</td></tr>
                 <tr><td>Panel Thickness</td><td>{config.panelThickness} mm</td></tr>
                 <tr><td>Standard Panel Width</td><td>{config.panelWidthMM} mm</td></tr>
@@ -185,7 +192,7 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
           <div className="contact-card">
             <div className="contact-icon">📞</div>
             <div>
-              <div className="contact-title">Contact ESSARFAB for Pricing &amp; Orders</div>
+              <div className="contact-title">Contact ESSARFAB for Pricing & Orders</div>
               <div className="contact-phone">+91-98387 00617</div>
               <div className="contact-web">WhatsApp: +91-80528 75755 · infoessarfabgreen@gmail.com</div>
               <div className="contact-web">www.essarfabgreenindia.com</div>

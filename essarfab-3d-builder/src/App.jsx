@@ -15,6 +15,17 @@ import {
 } from "./utils/sceneLayout";
 import "./App.css";
 
+// ─── Unit conversion ─────────────────────────────────────────────────────────
+const FT_PER_M = 3.28084;
+const M_PER_FT = 0.3048;
+
+function toM(val, unit) { return unit === "ft" ? val * M_PER_FT : val; }
+function fromM(val, unit) { return unit === "ft" ? val * FT_PER_M : val; }
+function fmt(val, unit, decimals = 1) {
+  const v = unit === "ft" ? val * FT_PER_M : val;
+  return v % 1 === 0 ? v.toFixed(0) : v.toFixed(decimals);
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 const PANEL_WIDTH_OPTIONS = [
   { label: "1000 mm", value: 1.0 },
@@ -38,16 +49,23 @@ const STRUCTURE_TYPES = [
   { value: "office",    label: "🏢 Modular Office / Porta Cabin" },
 ];
 
+const PANEL_TYPE_OPTIONS = [
+  { value: "both",  label: "📋 Both — Walls & Roof" },
+  { value: "wall",  label: "🧱 Walls Only" },
+  { value: "roof",  label: "🏠 Roof Only" },
+];
+
 const STEPS = [
   { id: 1, label: "Structure" },
   { id: 2, label: "Partitions" },
   { id: 3, label: "Openings" },
   { id: 4, label: "Panels" },
-  { id: 5, label: "Results" },
+  { id: 5, label: "Panel Type" },
+  { id: 6, label: "Results" },
 ];
 
 // ─── Calculator Core ─────────────────────────────────────────────────────────
-function calculate({ length, width, height, partitions, openings, panelWidthM, panelThickness }) {
+function calculate({ length, width, height, partitions, openings, panelWidthM, wallThickness, roofThickness, panelType, showRoof }) {
   const pw = panelWidthM;
 
   // Outer walls gross areas
@@ -88,21 +106,38 @@ function calculate({ length, width, height, partitions, openings, panelWidthM, p
 
   const totalWallPanels = wallRows.reduce((s, w) => s + w.panelCount, 0);
   const totalPartitionPanels = partitionRows.reduce((s, p) => s + p.panelCount, 0);
-  const totalPanels = totalWallPanels + roofPanelCount + totalPartitionPanels;
+
+  // Panel counts based on panel type selection
+  let totalPanels = 0;
+  if (panelType === "wall" || panelType === "both") {
+    totalPanels += totalWallPanels + totalPartitionPanels;
+  }
+  if ((panelType === "roof" || panelType === "both") && showRoof) {
+    totalPanels += roofPanelCount;
+  }
 
   const totalWallArea = wallRows.reduce((s, w) => s + w.netArea, 0);
   const totalPartitionArea = partitionRows.reduce((s, p) => s + p.netArea, 0);
-  const totalArea = totalWallArea + roofArea + totalPartitionArea;
 
-  // Weight: ~12 kg per mm thickness per m² (approximate for PUF panel)
-  const weight = totalArea * panelThickness * 0.012;
+  // Weight uses appropriate thickness per panel type
+  let totalArea = 0;
+  let weight = 0;
+  if (panelType === "wall" || panelType === "both") {
+    totalArea += totalWallArea + totalPartitionArea;
+    weight += (totalWallArea + totalPartitionArea) * wallThickness * 0.012;
+  }
+  if ((panelType === "roof" || panelType === "both") && showRoof) {
+    totalArea += roofArea;
+    weight += roofArea * roofThickness * 0.012;
+  }
 
-  return { wallRows, roofArea, roofPanelCount, partitionRows, totalPanels, totalArea, weight };
+  return { wallRows, roofArea, roofPanelCount, partitionRows, totalPanels, totalArea, weight, wallThickness, roofThickness };
 }
 
 // ─── 3D Scene ─────────────────────────────────────────────────────────────────
-function Scene({ length, width, height, panelThickness, panelColor, panelWidthM, showRoof, openings, partitions }) {
-  const t = panelThickness / 1000;
+function Scene({ length, width, height, wallThickness, roofThickness, panelColor, panelWidthM, showRoof, openings, partitions, unit, panelType }) {
+  const wallT = wallThickness / 1000;
+  const roofT = roofThickness / 1000;
   const pw = panelWidthM;
 
   const partitionLayouts = getPartitionLayouts(partitions, length, width, height);
@@ -123,13 +158,17 @@ function Scene({ length, width, height, panelThickness, panelColor, panelWidthM,
     const span = wallSpans[wallId] ?? length;
     layoutAlongWall(wallOpenings, span).forEach(({ item, offset }) => {
       const layout = partitionMap[wallId];
-      const transform = getOpeningTransform(item, layout, { length, width, thickness: t, offset });
+      const transform = getOpeningTransform(item, layout, { length, width, thickness: wallT, offset });
       if (transform) placedOpenings.push({ opening: item, ...transform });
     });
   });
 
   const doorCount = openings.filter(o => o.type === "door").length;
   const windowCount = openings.filter(o => o.type === "window").length;
+
+  // Determine if walls and roof should be rendered
+  const showWalls = panelType === "wall" || panelType === "both";
+  const showRoofPanel = showRoof && (panelType === "roof" || panelType === "both");
 
   return (
     <>
@@ -150,18 +189,22 @@ function Scene({ length, width, height, panelThickness, panelColor, panelWidthM,
 
       <FloorSlab length={length} width={width} />
 
-      {/* Outer walls */}
-      <Panel position={[0, height / 2, width / 2]} size={[length, height, t]} color={panelColor} panelWidth={pw} />
-      <Panel position={[0, height / 2, -width / 2]} rotation={[0, Math.PI, 0]} size={[length, height, t]} color={panelColor} panelWidth={pw} />
-      <Panel position={[-length / 2, height / 2, 0]} rotation={[0, -Math.PI / 2, 0]} size={[width, height, t]} color={panelColor} panelWidth={pw} />
-      <Panel position={[length / 2, height / 2, 0]} rotation={[0, Math.PI / 2, 0]} size={[width, height, t]} color={panelColor} panelWidth={pw} />
+      {/* Outer walls — only if panel type includes walls */}
+      {showWalls && (
+        <>
+          <Panel position={[0, height / 2, width / 2]} size={[length, height, wallT]} color={panelColor} panelWidth={pw} />
+          <Panel position={[0, height / 2, -width / 2]} rotation={[0, Math.PI, 0]} size={[length, height, wallT]} color={panelColor} panelWidth={pw} />
+          <Panel position={[-length / 2, height / 2, 0]} rotation={[0, -Math.PI / 2, 0]} size={[width, height, wallT]} color={panelColor} panelWidth={pw} />
+          <Panel position={[length / 2, height / 2, 0]} rotation={[0, Math.PI / 2, 0]} size={[width, height, wallT]} color={panelColor} panelWidth={pw} />
+        </>
+      )}
 
-      {/* Internal partition walls */}
-      {partitionLayouts.map(({ partition, index, wallLen, wallH, z }) => (
+      {/* Internal partition walls — only if panel type includes walls */}
+      {showWalls && partitionLayouts.map(({ partition, index, wallLen, wallH, z }) => (
         <group key={partition.id ?? index}>
           <Panel
             position={[0, wallH / 2, z]}
-            size={[wallLen, wallH, t]}
+            size={[wallLen, wallH, wallT]}
             color="#dce8e0"
             panelWidth={pw}
           />
@@ -179,19 +222,19 @@ function Scene({ length, width, height, panelThickness, panelColor, panelWidthM,
         </group>
       ))}
 
-      {/* Roof */}
-      {showRoof && (
-        <Panel position={[0, height + t / 2, 0]} rotation={[Math.PI / 2, 0, 0]}
-          size={[length, width, t]} color={panelColor} panelWidth={pw} />
+      {/* Roof — only if panel type includes roof */}
+      {showRoofPanel && (
+        <Panel position={[0, height + roofT / 2, 0]} rotation={[Math.PI / 2, 0, 0]}
+          size={[length, width, roofT]} color={panelColor} panelWidth={pw} />
       )}
 
-      {/* Corner trims */}
-      {[[-length/2, width/2], [length/2, width/2], [-length/2, -width/2], [length/2, -width/2]].map(([x, z], i) => (
+      {/* Corner trims — only if walls are shown */}
+      {showWalls && [[-length/2, width/2], [length/2, width/2], [-length/2, -width/2], [length/2, -width/2]].map(([x, z], i) => (
         <CornerTrim key={i} position={[x, height / 2, z]} height={height} />
       ))}
 
-      {/* Doors & windows on all walls / partitions */}
-      {placedOpenings.map(({ opening, position, rotation, width: w, height: h, sill }, i) =>
+      {/* Doors & windows on all walls / partitions — only if walls are shown */}
+      {showWalls && placedOpenings.map(({ opening, position, rotation, width: w, height: h, sill }, i) =>
         opening.type === "door" ? (
           <group key={opening.id ?? i}>
             <Door
@@ -200,7 +243,7 @@ function Scene({ length, width, height, panelThickness, panelColor, panelWidthM,
               doorWidth={w}
               doorHeight={h}
               color={panelColor}
-              thickness={t}
+              thickness={wallT}
             />
             <Text
               position={[position[0], h + 0.25, position[2]]}
@@ -223,7 +266,7 @@ function Scene({ length, width, height, panelThickness, panelColor, panelWidthM,
               windowWidth={w}
               windowHeight={h}
               sillHeight={sill}
-              thickness={t}
+              thickness={wallT}
             />
             <Text
               position={[position[0], sill + h + 0.25, position[2]]}
@@ -254,18 +297,21 @@ function Scene({ length, width, height, panelThickness, panelColor, panelWidthM,
         {`Partitions: ${partitions.length}  |  Doors: ${doorCount}  |  Windows: ${windowCount}`}
       </Text>
 
-      {/* Dimension text */}
+      {/* Dimension text in selected unit */}
       <Text position={[0, height + 1.5, width / 2 + 0.5]}
         fontSize={0.45} color="#f5a623" anchorX="center" anchorY="middle"
         outlineWidth={0.03} outlineColor="#000">
-        {`${length}m × ${width}m × ${height}m`}
+        {unit === "ft"
+          ? `${fmt(length, "ft", 1)}ft × ${fmt(width, "ft", 1)}ft × ${fmt(height, "ft", 1)}ft`
+          : `${fmt(length, "m")}m × ${fmt(width, "m")}m × ${fmt(height, "m")}m`
+        }
       </Text>
     </>
   );
 }
 
 // ─── Step Components ──────────────────────────────────────────────────────────
-function StepIndicator({ current, total }) {
+function StepIndicator({ current }) {
   return (
     <div className="step-indicator">
       {STEPS.map((s) => (
@@ -281,8 +327,9 @@ function StepIndicator({ current, total }) {
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [step, setStep] = useState(1);
+  const [unit, setUnit] = useState("m"); // "m" or "ft"
 
-  // Step 1 — Structure
+  // Step 1 — Structure (defaults in meters)
   const [structureType, setStructureType] = useState("coldroom");
   const [length, setLength] = useState(10);
   const [width, setWidth]   = useState(8);
@@ -296,11 +343,15 @@ export default function App() {
     { id: 1, type: "door", wall: "front", width: "1.2", height: "2.1", label: "Main Door" }
   ]);
 
-  // Step 4 — Panel config
-  const [panelThickness, setPanelThickness] = useState(100);
+  // Step 4 — Panel config (general)
   const [panelColor,     setPanelColor]     = useState("#f5f5f5");
   const [panelWidthMM,   setPanelWidthMM]   = useState(1200);
   const [showRoof,       setShowRoof]       = useState(true);
+
+  // Step 5 — Panel Type with separate thicknesses
+  const [panelType,      setPanelType]      = useState("both");
+  const [wallThickness,  setWallThickness]  = useState(100);
+  const [roofThickness,  setRoofThickness]  = useState(100);
 
   // Quote modal
   const [quoteOpen, setQuoteOpen] = useState(false);
@@ -311,27 +362,64 @@ export default function App() {
   const windowCount = openings.filter(o => o.type === "window").length;
   const partitionCount = partitions.length;
 
-  // Live calculation
-  const calc = useMemo(() => calculate({
-    length, width, height, partitions, openings, panelWidthM, panelThickness
-  }), [length, width, height, partitions, openings, panelWidthM, panelThickness]);
+  // Convert display values based on unit
+  const lengthM = toM(length, unit);
+  const widthM = toM(width, unit);
+  const heightM = toM(height, unit);
 
-  // Partition helpers
-  const addPartition = () =>
-    setPartitions(p => [...p, { id: Date.now(), label: `Partition ${p.length + 1}`, length: "5", height: String(height) }]);
+  // Live calculation (internal always in meters)
+  const calc = useMemo(() => calculate({
+    length: lengthM, width: widthM, height: heightM, partitions, openings, panelWidthM,
+    wallThickness, roofThickness, panelType, showRoof
+  }), [lengthM, widthM, heightM, partitions, openings, panelWidthM, wallThickness, roofThickness, panelType, showRoof]);
+
+  // Partition helpers — store values in the unit the user sees
+  const addPartition = () => {
+    const defaultLen = unit === "ft" ? "16" : "5";
+    setPartitions(p => [...p, { id: Date.now(), label: `Partition ${p.length + 1}`, length: defaultLen, height: String(fromM(height, unit)) }]);
+  };
   const removePartition = (id) => setPartitions(p => p.filter(x => x.id !== id));
   const updatePartition = (id, field, val) =>
     setPartitions(p => p.map(x => x.id === id ? { ...x, [field]: val } : x));
 
   // Opening helpers
-  const addOpening = () =>
-    setOpenings(o => [...o, { id: Date.now(), type: "door", wall: "front", width: "1.2", height: "2.1", label: "Opening" }]);
+  const addOpening = () => {
+    const dw = unit === "ft" ? "4.0" : "1.2";
+    const dh = unit === "ft" ? "7.0" : "2.1";
+    setOpenings(o => [...o, { id: Date.now(), type: "door", wall: "front", width: dw, height: dh, label: "Opening" }]);
+  };
   const removeOpening = (id) => setOpenings(o => o.filter(x => x.id !== id));
   const updateOpening = (id, field, val) =>
     setOpenings(o => o.map(x => x.id === id ? { ...x, [field]: val } : x));
 
-  const next = () => setStep(s => Math.min(s + 1, 5));
+  const next = () => setStep(s => Math.min(s + 1, 6));
   const prev = () => setStep(s => Math.max(s - 1, 1));
+
+  // Toggle unit and convert current values
+  const toggleUnit = () => {
+    setUnit(u => {
+      const newUnit = u === "m" ? "ft" : "m";
+      // Convert existing values
+      setLength(v => fromM(v, newUnit));
+      setWidth(v => fromM(v, newUnit));
+      setHeight(v => fromM(v, newUnit));
+      setPartitions(prev => prev.map(p => ({
+        ...p,
+        length: String(fromM(parseFloat(p.length) || 0, newUnit)),
+        height: String(fromM(parseFloat(p.height) || 0, newUnit)),
+      })));
+      setOpenings(prev => prev.map(o => ({
+        ...o,
+        width: String(fromM(parseFloat(o.width) || 0, newUnit)),
+        height: String(fromM(parseFloat(o.height) || 0, newUnit)),
+      })));
+      return newUnit;
+    });
+  };
+
+  const unitLabel = unit === "m" ? "m" : "ft";
+  const areaUnitLabel = unit === "m" ? "m²" : "sq. ft";
+  const displayUnit = unit === "m" ? "m" : "ft";
 
   return (
     <div className="app-layout">
@@ -342,7 +430,7 @@ export default function App() {
           {/* Brand */}
           <div className="brand">
             <div className="brand-logo">ESSARFAB</div>
-            <div className="brand-subtitle">PUF Panel Calculator &amp; 3D Builder</div>
+            <div className="brand-subtitle">PUF Panel Calculator & 3D Builder</div>
             <a className="back-link" href="../../index.html">← Back to Website</a>
           </div>
 
@@ -354,6 +442,15 @@ export default function App() {
             <div className="step-content">
               <div className="step-title">Step 1: Structure Details</div>
               <p className="step-desc">What type of structure are you building? Enter the outer dimensions.</p>
+
+              {/* Unit toggle */}
+              <div className="unit-toggle">
+                <span className="field-label">Unit System</span>
+                <div className="unit-btns">
+                  <button className={`unit-btn${unit === "m" ? " active" : ""}`} onClick={() => unit !== "m" && toggleUnit()}>Metric (m)</button>
+                  <button className={`unit-btn${unit === "ft" ? " active" : ""}`} onClick={() => unit !== "ft" && toggleUnit()}>Imperial (ft)</button>
+                </div>
+              </div>
 
               <div className="field">
                 <span className="field-label">Structure Type</span>
@@ -369,26 +466,26 @@ export default function App() {
 
               <div className="dim-row">
                 <label>
-                  Length (m)
-                  <input type="number" min={2} max={100} step={0.5} value={length}
-                    onChange={e => setLength(Math.max(2, parseFloat(e.target.value)||2))} />
+                  Length ({displayUnit})
+                  <input type="number" min={1} max={unit === "ft" ? 330 : 100} step={0.5} value={length}
+                    onChange={e => setLength(Math.max(1, parseFloat(e.target.value)||1))} />
                 </label>
                 <label>
-                  Width (m)
-                  <input type="number" min={2} max={100} step={0.5} value={width}
-                    onChange={e => setWidth(Math.max(2, parseFloat(e.target.value)||2))} />
+                  Width ({displayUnit})
+                  <input type="number" min={1} max={unit === "ft" ? 330 : 100} step={0.5} value={width}
+                    onChange={e => setWidth(Math.max(1, parseFloat(e.target.value)||1))} />
                 </label>
                 <label>
-                  Height (m)
-                  <input type="number" min={2} max={15} step={0.5} value={height}
-                    onChange={e => setHeight(Math.max(2, parseFloat(e.target.value)||2))} />
+                  Height ({displayUnit})
+                  <input type="number" min={1} max={unit === "ft" ? 50 : 15} step={0.5} value={height}
+                    onChange={e => setHeight(Math.max(1, parseFloat(e.target.value)||1))} />
                 </label>
               </div>
 
               <div className="dim-summary">
-                <span>Floor Area: <strong>{(length*width).toFixed(1)} m²</strong></span>
-                <span>Perimeter: <strong>{(2*(length+width)).toFixed(1)} m</strong></span>
-                <span>Wall Area (gross): <strong>{(2*(length+width)*height).toFixed(1)} m²</strong></span>
+                <span>Floor Area: <strong>{(lengthM * widthM).toFixed(1)} m² {unit === "ft" ? `/ ${(length * width).toFixed(1)} sq.ft` : ""}</strong></span>
+                <span>Perimeter: <strong>{fmt(lengthM + widthM, "m", 1).replace("m","")} m {unit === "ft" ? `/ ${(2*(length+width)).toFixed(1)} ft` : ""}</strong></span>
+                <span>Wall Area (gross): <strong>{(2*(lengthM + widthM) * heightM).toFixed(1)} m²</strong></span>
               </div>
             </div>
           )}
@@ -417,18 +514,18 @@ export default function App() {
                         placeholder="e.g. Room Divider" />
                     </label>
                     <label>
-                      Length (m)
-                      <input type="number" min={0.5} step={0.5} value={p.length}
+                      Length ({displayUnit})
+                      <input type="number" min={1} step={0.5} value={p.length}
                         onChange={e => updatePartition(p.id, "length", e.target.value)} />
                     </label>
                     <label>
-                      Height (m)
-                      <input type="number" min={1} max={15} step={0.5} value={p.height}
+                      Height ({displayUnit})
+                      <input type="number" min={1} max={unit === "ft" ? 50 : 15} step={0.5} value={p.height}
                         onChange={e => updatePartition(p.id, "height", e.target.value)} />
                     </label>
                   </div>
                   <div className="partition-area">
-                    Area: <strong>{((parseFloat(p.length)||0)*(parseFloat(p.height)||0)).toFixed(2)} m²</strong>
+                    Area: <strong>{(toM(parseFloat(p.length)||0, unit) * toM(parseFloat(p.height)||0, unit)).toFixed(2)} m²</strong>
                   </div>
                 </div>
               ))}
@@ -440,7 +537,7 @@ export default function App() {
               {partitions.length > 0 && (
                 <div className="dim-summary" style={{marginTop:"12px"}}>
                   Total Partition Area: <strong>
-                    {partitions.reduce((s,p)=>s+(parseFloat(p.length)||0)*(parseFloat(p.height)||0),0).toFixed(2)} m²
+                    {partitions.reduce((s,p)=>s + (toM(parseFloat(p.length)||0, unit) * toM(parseFloat(p.height)||0, unit)),0).toFixed(2)} m²
                   </strong>
                 </div>
               )}
@@ -450,7 +547,7 @@ export default function App() {
           {/* ════ STEP 3 — OPENINGS ════ */}
           {step === 3 && (
             <div className="step-content">
-              <div className="step-title">Step 3: Doors &amp; Windows</div>
+              <div className="step-title">Step 3: Doors & Windows</div>
               <p className="step-desc">Add all openings — doors and windows. These areas will be deducted from the panel calculation.</p>
 
               {openings.map((o, i) => (
@@ -485,18 +582,18 @@ export default function App() {
                       </select>
                     </label>
                     <label>
-                      Width (m)
-                      <input type="number" min={0.5} max={5} step={0.1} value={o.width}
+                      Width ({displayUnit})
+                      <input type="number" min={1} max={unit === "ft" ? 16 : 5} step={0.1} value={o.width}
                         onChange={e => updateOpening(o.id, "width", e.target.value)} />
                     </label>
                     <label>
-                      Height (m)
-                      <input type="number" min={0.5} max={5} step={0.1} value={o.height}
+                      Height ({displayUnit})
+                      <input type="number" min={1} max={unit === "ft" ? 16 : 5} step={0.1} value={o.height}
                         onChange={e => updateOpening(o.id, "height", e.target.value)} />
                     </label>
                   </div>
                   <div className="partition-area">
-                    Opening Area: <strong>{((parseFloat(o.width)||0)*(parseFloat(o.height)||0)).toFixed(2)} m²</strong>
+                    Opening Area: <strong>{(toM(parseFloat(o.width)||0, unit) * toM(parseFloat(o.height)||0, unit)).toFixed(2)} m²</strong>
                   </div>
                 </div>
               ))}
@@ -508,29 +605,18 @@ export default function App() {
               {openings.length > 0 && (
                 <div className="dim-summary" style={{marginTop:"12px"}}>
                   Total Deducted Area: <strong>
-                    {openings.reduce((s,o)=>s+(parseFloat(o.width)||0)*(parseFloat(o.height)||0),0).toFixed(2)} m²
+                    {openings.reduce((s,o)=>s + (toM(parseFloat(o.width)||0, unit) * toM(parseFloat(o.height)||0, unit)),0).toFixed(2)} m²
                   </strong>
                 </div>
               )}
             </div>
           )}
 
-          {/* ════ STEP 4 — PANELS ════ */}
+          {/* ════ STEP 4 — PANELS (General) ════ */}
           {step === 4 && (
             <div className="step-content">
-              <div className="step-title">Step 4: Panel Configuration</div>
-              <p className="step-desc">Select your PUF sandwich panel specifications.</p>
-
-              <label>
-                Panel Thickness
-                <select value={panelThickness} onChange={e => setPanelThickness(Number(e.target.value))}>
-                  <option value={60}>60 mm — Light insulation</option>
-                  <option value={80}>80 mm — Standard</option>
-                  <option value={100}>100 mm — Cold Room (default)</option>
-                  <option value={120}>120 mm — Deep Freeze</option>
-                  <option value={150}>150 mm — Heavy insulation</option>
-                </select>
-              </label>
+              <div className="step-title">Step 4: Panel Specifications</div>
+              <p className="step-desc">Select the common panel specifications. You can set different thicknesses for walls and roof in the next step.</p>
 
               <label>
                 Standard Panel Width
@@ -559,7 +645,7 @@ export default function App() {
               <label className="toggle-label">
                 <input type="checkbox" checked={showRoof}
                   onChange={e => setShowRoof(e.target.checked)} />
-                Include Roof Panels in calculation
+                Include Roof in calculation & 3D view
               </label>
 
               <div className="info-box">
@@ -568,8 +654,72 @@ export default function App() {
             </div>
           )}
 
-          {/* ════ STEP 5 — RESULTS ════ */}
+          {/* ════ STEP 5 — PANEL TYPE ════ */}
           {step === 5 && (
+            <div className="step-content">
+              <div className="step-title">Step 5: Choose Panel Type</div>
+              <p className="step-desc">Select which panels you need — walls, roof, or both. You can also set different thicknesses for each.</p>
+
+              <div className="field">
+                <span className="field-label">Panel Type</span>
+                {PANEL_TYPE_OPTIONS.map(s => (
+                  <label key={s.value} className="radio-label">
+                    <input type="radio" name="pt" value={s.value}
+                      checked={panelType === s.value}
+                      onChange={() => setPanelType(s.value)} />
+                    {s.label}
+                  </label>
+                ))}
+              </div>
+
+              {/* Wall Panel Thickness — shown when walls are included */}
+              {(panelType === "wall" || panelType === "both") && (
+                <div className="panel-type-section">
+                  <div className="panel-type-heading">🧱 Wall Panel Thickness</div>
+                  <select value={wallThickness} onChange={e => setWallThickness(Number(e.target.value))}>
+                    <option value={60}>60 mm — Light insulation</option>
+                    <option value={80}>80 mm — Standard</option>
+                    <option value={100}>100 mm — Cold Room (default)</option>
+                    <option value={120}>120 mm — Deep Freeze</option>
+                    <option value={150}>150 mm — Heavy insulation</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Roof Panel Thickness — shown when roof is included */}
+              {(panelType === "roof" || panelType === "both") && showRoof && (
+                <div className="panel-type-section">
+                  <div className="panel-type-heading">🏠 Roof Panel Thickness</div>
+                  <select value={roofThickness} onChange={e => setRoofThickness(Number(e.target.value))}>
+                    <option value={60}>60 mm — Light insulation</option>
+                    <option value={80}>80 mm — Standard</option>
+                    <option value={100}>100 mm — Cold Room (default)</option>
+                    <option value={120}>120 mm — Deep Freeze</option>
+                    <option value={150}>150 mm — Heavy insulation</option>
+                  </select>
+                </div>
+              )}
+
+              {panelType === "roof" && !showRoof && (
+                <div className="info-box" style={{borderColor:"rgba(245,166,35,0.4)", color:"var(--accent)"}}>
+                  ⚠️ Roof is currently disabled in Step 4. Enable "Include Roof" to configure roof panels.
+                </div>
+              )}
+
+              <div className="dim-summary" style={{marginTop:"4px"}}>
+                <span>Panel Type: <strong>{PANEL_TYPE_OPTIONS.find(p => p.value === panelType)?.label || panelType}</strong></span>
+                {wallThickness && (panelType === "wall" || panelType === "both") && (
+                  <span>Wall Thickness: <strong>{wallThickness} mm</strong></span>
+                )}
+                {roofThickness && (panelType === "roof" || panelType === "both") && showRoof && (
+                  <span>Roof Thickness: <strong>{roofThickness} mm</strong></span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ════ STEP 6 — RESULTS ════ */}
+          {step === 6 && (
             <div className="step-content results-content">
               <div className="step-title">📊 Panel Calculation Results</div>
 
@@ -587,15 +737,25 @@ export default function App() {
                   <span className="rs-label">Est. Weight (kg)</span>
                 </div>
                 <div className="result-stat">
-                  <span className="rs-val">{panelThickness} mm</span>
-                  <span className="rs-label">Thickness</span>
+                  <span className="rs-val">{panelType === "both" ? `${wallThickness}/${roofThickness} mm` : `${panelType === "wall" ? wallThickness : roofThickness} mm`}</span>
+                  <span className="rs-label">Panel Thickness</span>
                 </div>
+              </div>
+
+              <div className="dim-summary" style={{justifyContent:"center"}}>
+                <span>Panel Type: <strong>{PANEL_TYPE_OPTIONS.find(p => p.value === panelType)?.label || panelType}</strong></span>
+                {unit === "ft" ? (
+                  <span>Dimensions: <strong>{fmt(lengthM, "ft", 1)} ft × {fmt(widthM, "ft", 1)} ft × {fmt(heightM, "ft", 1)} ft</strong></span>
+                ) : (
+                  <span>Dimensions: <strong>{fmt(lengthM, "m")} m × {fmt(widthM, "m")} m × {fmt(heightM, "m")} m</strong></span>
+                )}
+                <span>Floor Area: <strong>{unit === "ft" ? (length * width).toFixed(1) : (lengthM * widthM).toFixed(1)} {unit === "ft" ? "sq.ft" : "m²"}</strong></span>
               </div>
 
               <div className="results-table-wrap">
                 <div className="results-section-title">Outer Walls</div>
                 <table className="calc-table">
-                  <thead><tr><th>Wall</th><th>Gross m²</th><th>Deduct m²</th><th>Net m²</th><th>Panels</th></tr></thead>
+                  <thead><tr><th>Wall</th><th>Gross {areaUnitLabel}</th><th>Deduct {areaUnitLabel}</th><th>Net {areaUnitLabel}</th><th>Panels</th></tr></thead>
                   <tbody>
                     {calc.wallRows.map(w => (
                       <tr key={w.id}>
@@ -609,12 +769,12 @@ export default function App() {
                   </tbody>
                 </table>
 
-                {showRoof && (
+                {showRoof && (panelType === "roof" || panelType === "both") && (
                   <>
                     <div className="results-section-title" style={{marginTop:"10px"}}>Roof</div>
                     <table className="calc-table">
                       <tbody>
-                        <tr><td>Roof Panel</td><td>{(length*width).toFixed(1)}</td><td>—</td><td>{(length*width).toFixed(1)}</td><td><strong>{calc.roofPanelCount}</strong></td></tr>
+                        <tr><td>Roof Panel</td><td>{(lengthM * widthM).toFixed(1)}</td><td>—</td><td>{(lengthM * widthM).toFixed(1)}</td><td><strong>{calc.roofPanelCount}</strong></td></tr>
                       </tbody>
                     </table>
                   </>
@@ -624,7 +784,7 @@ export default function App() {
                   <>
                     <div className="results-section-title" style={{marginTop:"10px"}}>Partitions</div>
                     <table className="calc-table">
-                      <thead><tr><th>Partition</th><th>Gross m²</th><th>Deduct m²</th><th>Net m²</th><th>Panels</th></tr></thead>
+                      <thead><tr><th>Partition</th><th>Gross {areaUnitLabel}</th><th>Deduct {areaUnitLabel}</th><th>Net {areaUnitLabel}</th><th>Panels</th></tr></thead>
                       <tbody>
                         {calc.partitionRows.map((p, i) => (
                           <tr key={i}>
@@ -644,14 +804,14 @@ export default function App() {
                   <>
                     <div className="results-section-title" style={{marginTop:"10px"}}>Openings (Deducted)</div>
                     <table className="calc-table">
-                      <thead><tr><th>Label</th><th>Type</th><th>W×H</th><th>Area m²</th></tr></thead>
+                      <thead><tr><th>Label</th><th>Type</th><th>W×H</th><th>Area {areaUnitLabel}</th></tr></thead>
                       <tbody>
                         {openings.map(o => (
                           <tr key={o.id}>
                             <td>{o.label}</td>
                             <td style={{textTransform:"capitalize"}}>{o.type}</td>
-                            <td>{o.width}×{o.height}m</td>
-                            <td><span className="deduct">-{((parseFloat(o.width)||0)*(parseFloat(o.height)||0)).toFixed(2)}</span></td>
+                            <td>{o.width}×{o.height} {displayUnit}</td>
+                            <td><span className="deduct">-{(toM(parseFloat(o.width)||0, unit) * toM(parseFloat(o.height)||0, unit)).toFixed(2)}</span></td>
                           </tr>
                         ))}
                       </tbody>
@@ -671,12 +831,12 @@ export default function App() {
             {step > 1 && (
               <button className="btn btn-outline" onClick={prev}>← Back</button>
             )}
-            {step < 5 && (
+            {step < 6 && (
               <button className="btn btn-primary" onClick={next}>
-                {step === 4 ? "Calculate →" : "Next →"}
+                {step === 5 ? "Calculate →" : "Next →"}
               </button>
             )}
-            {step === 5 && (
+            {step === 6 && (
               <button className="btn btn-outline" onClick={() => setStep(1)}>↺ Start Over</button>
             )}
           </div>
@@ -696,14 +856,19 @@ export default function App() {
           <span className="stat-chip windows">
             <strong>{windowCount}</strong> Window{windowCount !== 1 ? "s" : ""}
           </span>
+          <span className="stat-chip" style={{color: "#f5a623"}}>
+            <strong style={{color: "#f5a623"}}>{PANEL_TYPE_OPTIONS.find(p => p.value === panelType)?.label.split(" ")[0]}</strong>
+          </span>
         </div>
 
-        <Canvas shadows camera={{ position: [length * 1.6, height * 2.2, width * 2], fov: 45 }} gl={{ antialias: true }}>
+        <Canvas shadows camera={{ position: [lengthM * 1.6, heightM * 2.2, widthM * 2], fov: 45 }} gl={{ antialias: true }}>
           <Scene
-            length={length} width={width} height={height}
-            panelThickness={panelThickness} panelColor={panelColor}
+            length={lengthM} width={widthM} height={heightM}
+            wallThickness={wallThickness} roofThickness={roofThickness}
+            panelColor={panelColor}
             panelWidthM={panelWidthMM / 1000}
             showRoof={showRoof} openings={openings} partitions={partitions}
+            unit={unit} panelType={panelType}
           />
         </Canvas>
 
@@ -715,7 +880,7 @@ export default function App() {
       <QuoteModal
         open={quoteOpen}
         onClose={() => setQuoteOpen(false)}
-        config={{ length, width, height, panelThickness, panelColor, panelWidthMM, structureType, showRoof }}
+        config={{ length: lengthM, width: widthM, height: heightM, displayLength: length, displayWidth: width, displayHeight: height, wallThickness, roofThickness, panelColor, panelWidthMM, structureType, showRoof, unit, panelType }}
         calc={calc}
         openings={openings}
         partitions={partitions}

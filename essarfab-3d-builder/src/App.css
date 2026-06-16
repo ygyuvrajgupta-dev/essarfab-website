@@ -244,6 +244,43 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', system-u
   gap: 6px;
 }
 
+/* ── Unit toggle ─────────────────────────────────────────── */
+.unit-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.unit-btns {
+  display: flex;
+  gap: 4px;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  padding: 3px;
+  border: 1px solid var(--border);
+}
+.unit-btn {
+  flex: 1;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.unit-btn.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(31,110,67,0.35);
+}
+.unit-btn:hover:not(.active) {
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+}
+
 .field-label {
   font-size: 11px;
   color: var(--text-muted);
@@ -394,6 +431,24 @@ select option { background: #1a3524; color: #fff; }
   color: var(--text-muted);
 }
 .partition-area strong { color: var(--primary-light); }
+
+/* ── Panel Type Section ───────────────────────────────────── */
+.panel-type-section {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.panel-type-heading {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
 
 /* ── Empty hint ───────────────────────────────────────────── */
 .empty-hint {
