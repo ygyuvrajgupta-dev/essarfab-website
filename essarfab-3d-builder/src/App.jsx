@@ -4,8 +4,15 @@ import { OrbitControls, Grid, Text } from "@react-three/drei";
 import Panel from "./components/Panel";
 import CornerTrim from "./components/CornerTrim";
 import Door from "./components/Door";
+import Window from "./components/Window";
 import FloorSlab from "./components/FloorSlab";
 import QuoteModal from "./components/QuoteModal";
+import {
+  layoutAlongWall,
+  getPartitionLayouts,
+  getOpeningTransform,
+  groupOpeningsByWall,
+} from "./utils/sceneLayout";
 import "./App.css";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -94,11 +101,35 @@ function calculate({ length, width, height, partitions, openings, panelWidthM, p
 }
 
 // ─── 3D Scene ─────────────────────────────────────────────────────────────────
-function Scene({ length, width, height, panelThickness, panelColor, panelWidthM, showRoof, openings }) {
+function Scene({ length, width, height, panelThickness, panelColor, panelWidthM, showRoof, openings, partitions }) {
   const t = panelThickness / 1000;
   const pw = panelWidthM;
 
-  const doors = openings.filter(o => o.type === "door");
+  const partitionLayouts = getPartitionLayouts(partitions, length, width, height);
+  const partitionMap = Object.fromEntries(partitionLayouts.map(p => [`partition_${p.index}`, p]));
+
+  const wallSpans = {
+    front: length,
+    back: length,
+    left: width,
+    right: width,
+    ...Object.fromEntries(partitionLayouts.map(p => [`partition_${p.index}`, p.wallLen])),
+  };
+
+  const grouped = groupOpeningsByWall(openings);
+  const placedOpenings = [];
+
+  Object.entries(grouped).forEach(([wallId, wallOpenings]) => {
+    const span = wallSpans[wallId] ?? length;
+    layoutAlongWall(wallOpenings, span).forEach(({ item, offset }) => {
+      const layout = partitionMap[wallId];
+      const transform = getOpeningTransform(item, layout, { length, width, thickness: t, offset });
+      if (transform) placedOpenings.push({ opening: item, ...transform });
+    });
+  });
+
+  const doorCount = openings.filter(o => o.type === "door").length;
+  const windowCount = openings.filter(o => o.type === "window").length;
 
   return (
     <>
@@ -119,11 +150,34 @@ function Scene({ length, width, height, panelThickness, panelColor, panelWidthM,
 
       <FloorSlab length={length} width={width} />
 
-      {/* Walls */}
+      {/* Outer walls */}
       <Panel position={[0, height / 2, width / 2]} size={[length, height, t]} color={panelColor} panelWidth={pw} />
       <Panel position={[0, height / 2, -width / 2]} rotation={[0, Math.PI, 0]} size={[length, height, t]} color={panelColor} panelWidth={pw} />
       <Panel position={[-length / 2, height / 2, 0]} rotation={[0, -Math.PI / 2, 0]} size={[width, height, t]} color={panelColor} panelWidth={pw} />
       <Panel position={[length / 2, height / 2, 0]} rotation={[0, Math.PI / 2, 0]} size={[width, height, t]} color={panelColor} panelWidth={pw} />
+
+      {/* Internal partition walls */}
+      {partitionLayouts.map(({ partition, index, wallLen, wallH, z }) => (
+        <group key={partition.id ?? index}>
+          <Panel
+            position={[0, wallH / 2, z]}
+            size={[wallLen, wallH, t]}
+            color="#dce8e0"
+            panelWidth={pw}
+          />
+          <Text
+            position={[0, wallH + 0.35, z]}
+            fontSize={0.28}
+            color="#3ec47e"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.02}
+            outlineColor="#000"
+          >
+            {`P${index + 1}: ${partition.label || `Partition ${index + 1}`}`}
+          </Text>
+        </group>
+      ))}
 
       {/* Roof */}
       {showRoof && (
@@ -136,12 +190,69 @@ function Scene({ length, width, height, panelThickness, panelColor, panelWidthM,
         <CornerTrim key={i} position={[x, height / 2, z]} height={height} />
       ))}
 
-      {/* Doors from openings */}
-      {doors.filter(d => d.wall === "front").map((d, i) => (
-        <Door key={i} position={[0, (parseFloat(d.height)||2.1)/2, width/2]}
-          rotation={[0,0,0]} doorWidth={parseFloat(d.width)||1.2}
-          doorHeight={parseFloat(d.height)||2.1} color={panelColor} thickness={t} />
-      ))}
+      {/* Doors & windows on all walls / partitions */}
+      {placedOpenings.map(({ opening, position, rotation, width: w, height: h, sill }, i) =>
+        opening.type === "door" ? (
+          <group key={opening.id ?? i}>
+            <Door
+              position={position}
+              rotation={rotation}
+              doorWidth={w}
+              doorHeight={h}
+              color={panelColor}
+              thickness={t}
+            />
+            <Text
+              position={[position[0], h + 0.25, position[2]]}
+              rotation={[0, rotation[1], 0]}
+              fontSize={0.22}
+              color="#f5a623"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.02}
+              outlineColor="#000"
+            >
+              {opening.label || `Door ${i + 1}`}
+            </Text>
+          </group>
+        ) : (
+          <group key={opening.id ?? i}>
+            <Window
+              position={position}
+              rotation={rotation}
+              windowWidth={w}
+              windowHeight={h}
+              sillHeight={sill}
+              thickness={t}
+            />
+            <Text
+              position={[position[0], sill + h + 0.25, position[2]]}
+              rotation={[0, rotation[1], 0]}
+              fontSize={0.22}
+              color="#64b5f6"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.02}
+              outlineColor="#000"
+            >
+              {opening.label || `Window ${i + 1}`}
+            </Text>
+          </group>
+        )
+      )}
+
+      {/* Summary counts in 3D */}
+      <Text
+        position={[-length / 2 - 0.8, height + 0.6, 0]}
+        fontSize={0.32}
+        color="#ffffff"
+        anchorX="left"
+        anchorY="middle"
+        outlineWidth={0.025}
+        outlineColor="#000"
+      >
+        {`Partitions: ${partitions.length}  |  Doors: ${doorCount}  |  Windows: ${windowCount}`}
+      </Text>
 
       {/* Dimension text */}
       <Text position={[0, height + 1.5, width / 2 + 0.5]}
@@ -195,6 +306,10 @@ export default function App() {
   const [quoteOpen, setQuoteOpen] = useState(false);
 
   const panelWidthM = panelWidthMM / 1000;
+
+  const doorCount = openings.filter(o => o.type === "door").length;
+  const windowCount = openings.filter(o => o.type === "window").length;
+  const partitionCount = partitions.length;
 
   // Live calculation
   const calc = useMemo(() => calculate({
@@ -571,12 +686,24 @@ export default function App() {
 
       {/* ─── 3D CANVAS ─────────────────────────────────────────── */}
       <main className="canvas-area">
+        <div className="canvas-stats" aria-live="polite">
+          <span className="stat-chip partitions">
+            <strong>{partitionCount}</strong> Partition{partitionCount !== 1 ? "s" : ""}
+          </span>
+          <span className="stat-chip doors">
+            <strong>{doorCount}</strong> Door{doorCount !== 1 ? "s" : ""}
+          </span>
+          <span className="stat-chip windows">
+            <strong>{windowCount}</strong> Window{windowCount !== 1 ? "s" : ""}
+          </span>
+        </div>
+
         <Canvas shadows camera={{ position: [length * 1.6, height * 2.2, width * 2], fov: 45 }} gl={{ antialias: true }}>
           <Scene
             length={length} width={width} height={height}
             panelThickness={panelThickness} panelColor={panelColor}
             panelWidthM={panelWidthMM / 1000}
-            showRoof={showRoof} openings={openings}
+            showRoof={showRoof} openings={openings} partitions={partitions}
           />
         </Canvas>
 

@@ -52,6 +52,40 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', system-u
   white-space: nowrap;
 }
 
+.canvas-stats {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(6px);
+}
+
+.stat-chip strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.stat-chip.partitions strong { color: #3ec47e; }
+.stat-chip.doors strong      { color: #f5a623; }
+.stat-chip.windows strong    { color: #64b5f6; }
+
 /* ── Sidebar ─────────────────────────────────────────────── */
 .sidebar {
   width: var(--sidebar-w);
