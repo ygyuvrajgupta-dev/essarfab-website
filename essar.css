@@ -154,7 +154,7 @@ a { color: inherit; }
           hue-rotate(115deg) brightness(70%);
 }
 
-//########### Navigate 3d builder
+/* Navigate 3d builder */
 /* Navigation container styling */
 nav[aria-label="3D Builder App"] {
   background-color: #1e1e2f;      /* Dark theme background */
@@ -1577,8 +1577,60 @@ footer {
 }
 
 @media (max-width: 480px) {
+  .container { padding: 0 16px; }
+
   .btn-group { flex-direction: column; }
-  .btn-primary, .btn-ghost { justify-content: center; }
+  .btn-primary, .btn-ghost { justify-content: center; width: 100%; text-align: center; }
   .app-grid { grid-template-columns: 1fr 1fr; }
-  .hero-title { font-size: 1.85rem; }
+  .hero-title { font-size: 1.7rem; }
+  .hero-sub { font-size: 0.95rem; }
+  .hero-stats { gap: 0.6rem; flex-direction: column; align-items: flex-start; }
+  .hero { padding: 3rem 0 5rem; }
+  .hero-eyebrow { font-size: 0.65rem; }
+
+  .section-title { font-size: 1.6rem; }
+  .section-sub { font-size: 0.92rem; margin-bottom: 2rem; }
+
+  .stat-pill { align-items: flex-start; width: 100%; flex-direction: row; gap: 0.4rem; }
+  .stat-pill span:last-child { margin-top: 0; }
+  .stat-num { font-size: 1.8rem; }
+
+  .trust-inner { gap: 0.4rem 0.8rem; font-size: 0.75rem; }
+
+  .product-card { padding: 1.4rem; }
+  .pc-body h3 { font-size: 1rem; }
+  .pc-body p { font-size: 0.8rem; }
+
+  .about-photo-badge { right: 0; bottom: -1rem; padding: 0.8rem 1rem; min-width: auto; }
+  .about-photo-badge strong { font-size: 0.85rem; }
+  .about-photo-badge span { font-size: 0.7rem; }
+  .about-photo-main { height: 220px; }
+  .about-point p { font-size: 0.82rem; }
+  .director-quote { padding: 1rem 1.2rem; }
+  .director-quote p { font-size: 0.85rem; }
+
+  .why-card { padding: 1.4rem; }
+  .why-icon { width: 48px; height: 48px; font-size: 1.2rem; }
+
+  .spec-chips span { font-size: 0.7rem; padding: 0.4rem 0.8rem; }
+  th, td { padding: 0.6rem 0.8rem; font-size: 0.78rem; }
+
+  .app-tile { padding: 1rem 0.6rem; }
+  .app-tile i { font-size: 1.4rem; }
+  .app-tile span { font-size: 0.75rem; }
+  .green-pledge { flex-direction: column; padding: 1.2rem; }
+
+  .faq-item summary { padding: 0.9rem 1rem; font-size: 0.85rem; }
+  .faq-item > p { padding: 0 1rem 1rem; font-size: 0.82rem; }
+
+  .cd-item { gap: 0.7rem; }
+  .cd-item strong { font-size: 0.85rem; }
+  .cd-item span, .cd-item a { font-size: 0.82rem; }
+  .form-card { padding: 1.5rem; }
+  .form-card h3 { font-size: 1.2rem; }
+
+  .footer-inner { padding: 2.5rem 0 2rem; gap: 1.5rem; }
+  .footer-links h4, .footer-contact h4 { font-size: 0.85rem; }
+  .hero-social-mobile { padding: 0 16px; }
+  .hero-social-mobile a { width: 32px; height: 32px; font-size: 0.78rem; }
 }
