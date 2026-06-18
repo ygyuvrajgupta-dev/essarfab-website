@@ -652,6 +652,7 @@ nav[aria-label="3D Builder App"] {
   border-radius: 0 var(--r-md) var(--r-md) 0;
   padding: 1.5rem 1.6rem;
   margin-top: 1rem;
+  background-color:#bfe7bf;
 }
 .director-quote .fas.fa-quote-left {
   font-size: 1.8rem;
