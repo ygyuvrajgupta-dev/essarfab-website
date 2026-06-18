@@ -64,6 +64,13 @@ const STEPS = [
   { id: 6, label: "Results" },
 ];
 
+const WALL_OPTIONS = [
+  { value: "front", label: "Front" },
+  { value: "back", label: "Back" },
+  { value: "left", label: "Left" },
+  { value: "right", label: "Right" },
+];
+
 function createDefaultFloor(id, unit, index = 0) {
   return {
     id,
@@ -73,12 +80,37 @@ function createDefaultFloor(id, unit, index = 0) {
     panelWidthMM: 1200,
     wallThickness: 100,
     partitions: [],
+    internalRooms: [],
     openings: [
       {
         id: Date.now() + id, type: "door", wall: "front",
         width: unit === "ft" ? "4.0" : "1.2",
         height: unit === "ft" ? "7.0" : "2.1",
         label: "Main Door",
+      },
+    ],
+  };
+}
+
+function createDefaultRoom(id, unit) {
+  return {
+    id,
+    label: `Room`,
+    positionX: "0", positionZ: "0",
+    roomLength: unit === "ft" ? "10" : "3",
+    roomWidth: unit === "ft" ? "8" : "2.5",
+    roomHeight: unit === "ft" ? "8" : "2.4",
+    panelColor: "#f5f5f5",
+    panelWidthMM: 1200,
+    wallThickness: 80,
+    showCeiling: true,
+    sideWalls: [], // "front", "back", "left", "right" — share with parent wall
+    openings: [
+      {
+        id: Date.now() + id + 1, type: "door", wall: "front",
+        width: unit === "ft" ? "3.0" : "0.9",
+        height: unit === "ft" ? "6.5" : "2.0",
+        label: "Room Door",
       },
     ],
   };
@@ -129,6 +161,64 @@ function calculate({ length, width, floors, panelType, showRoof, unit }) {
       return { label: p.label || `Partition ${pi + 1}`, grossArea, netArea, panelCount, deduct, length: l, height: h };
     });
 
+    // Internal Rooms
+    const roomRows = (floor.internalRooms || []).map((rm, ri) => {
+      const rl = toM(parseFloat(rm.roomLength) || 3, unit);
+      const rw = toM(parseFloat(rm.roomWidth) || 2.5, unit);
+      const rh = Math.min(toM(parseFloat(rm.roomHeight) || 2.4, unit), floorHeightM);
+      const rPW = (rm.panelWidthMM || 1200) / 1000;
+      const rT = rm.wallThickness || 80;
+
+      const sideWalls = rm.sideWalls || [];
+
+      const roomWalls = [
+        { id: `room${ri}_front`, label: `${rm.label || `Room ${ri+1}`} - Front`, wallLen: rl, wallH: rh, wallKey: "front" },
+        { id: `room${ri}_back`,  label: `${rm.label || `Room ${ri+1}`} - Back`,  wallLen: rl, wallH: rh, wallKey: "back" },
+        { id: `room${ri}_left`,  label: `${rm.label || `Room ${ri+1}`} - Left`,  wallLen: rw, wallH: rh, wallKey: "left" },
+        { id: `room${ri}_right`, label: `${rm.label || `Room ${ri+1}`} - Right`, wallLen: rw, wallH: rh, wallKey: "right" },
+      ];
+
+      // Filter out walls that share with parent (no extra panels needed)
+      const activeWalls = roomWalls.filter(w => !sideWalls.includes(w.wallKey));
+
+      const rWallRows = activeWalls.map(w => {
+        const grossArea = w.wallLen * w.wallH;
+        const openingDeduction = (rm.openings || [])
+          .filter(o => o.wall === w.id.replace(`room${ri}_`, ""))
+          .reduce((sum, o) => sum + (parseFloat(o.width) || 0) * (parseFloat(o.height) || 0), 0);
+        const netArea = Math.max(0, grossArea - openingDeduction);
+        const pCount = Math.ceil(w.wallLen / rPW);
+        return { ...w, grossArea, openingDeduction, netArea, panelCount: pCount };
+      });
+
+      const roomWallPanels = rWallRows.reduce((s, w) => s + w.panelCount, 0);
+      const roomWallArea = rWallRows.reduce((s, w) => s + w.netArea, 0);
+
+      // Ceiling
+      let ceilingPanels = 0;
+      let ceilingArea = 0;
+      if (rm.showCeiling) {
+        ceilingArea = rl * rw;
+        ceilingPanels = Math.ceil(rl / rPW) * Math.ceil(rw / rPW);
+      }
+
+      return {
+        label: rm.label || `Room ${ri + 1}`,
+        wallRows: rWallRows,
+        roomWallPanels,
+        roomWallArea,
+        ceilingPanels,
+        ceilingArea,
+        totalPanels: roomWallPanels + ceilingPanels,
+        totalArea: roomWallArea + ceilingArea,
+        weight: (roomWallArea + ceilingArea) * rT * 0.012,
+        wallThickness: rT,
+        panelColor: rm.panelColor,
+        panelWidthMM: rm.panelWidthMM,
+        openings: rm.openings || [],
+      };
+    });
+
     let floorPanels = 0;
     let floorArea = 0;
     let floorWeight = 0;
@@ -140,6 +230,13 @@ function calculate({ length, width, floors, panelType, showRoof, unit }) {
       const partArea = partitionRows.reduce((s, p) => s + p.netArea, 0);
       floorArea += wallArea + partArea;
       floorWeight += (wallArea + partArea) * wallT * 0.012;
+
+      // Add internal rooms
+      roomRows.forEach(rm => {
+        floorPanels += rm.totalPanels;
+        floorArea += rm.totalArea;
+        floorWeight += rm.weight;
+      });
     }
 
     // Roof — only on top floor
@@ -152,7 +249,7 @@ function calculate({ length, width, floors, panelType, showRoof, unit }) {
       roofPanelCount = Math.ceil(length / floorPW) * Math.ceil(width / floorPW);
       floorPanels += roofPanelCount;
       floorArea += roofArea;
-      floorWeight += roofArea * 100 * 0.012; // default roof thickness 100mm
+      floorWeight += roofArea * 100 * 0.012;
     }
 
     totalPanels += floorPanels;
@@ -164,6 +261,7 @@ function calculate({ length, width, floors, panelType, showRoof, unit }) {
       height: floorHeightM,
       wallRows,
       partitionRows,
+      roomRows,
       roofArea,
       roofPanelCount,
       floorPanels,
@@ -186,6 +284,135 @@ function calculate({ length, width, floors, panelType, showRoof, unit }) {
   };
 }
 
+// ─── Render a single internal room (4 walls + ceiling + openings) ────────────
+function InternalRoom3D({ room, index, floorHeight, yOffset, unit, length, width }) {
+  const rl = toM(parseFloat(room.roomLength) || 3, unit);
+  const rw = toM(parseFloat(room.roomWidth) || 2.5, unit);
+  const rh = Math.min(toM(parseFloat(room.roomHeight) || 2.4, unit), floorHeight);
+  const px = toM(parseFloat(room.positionX) || 0, unit);
+  const pz = toM(parseFloat(room.positionZ) || 0, unit);
+  const color = room.panelColor || "#f5f5f5";
+  const pw = (room.panelWidthMM || 1200) / 1000;
+  const wallT = (room.wallThickness || 80) / 1000;
+
+  // Clamp room position so it stays inside the building
+  const maxX = length / 2 - rl / 2 - 0.2;
+  const maxZ = width / 2 - rw / 2 - 0.2;
+  const cx = Math.max(-maxX, Math.min(maxX, px));
+  const cz = Math.max(-maxZ, Math.min(maxZ, pz));
+
+  // Layout openings per wall
+  const roomOpenings = room.openings || [];
+  const placedOpenings = [];
+
+  const wallSpans = { front: rl, back: rl, left: rw, right: rw };
+  const grouped = groupOpeningsByWall(roomOpenings);
+
+  Object.entries(grouped).forEach(([wallId, wallOpenings]) => {
+    const span = wallSpans[wallId] ?? rl;
+    layoutAlongWall(wallOpenings, span).forEach(({ item, offset }) => {
+      const doorW = parseFloat(item.width) || 0.9;
+      const doorH = parseFloat(item.height) || 2.0;
+      const sill = item.type === "window" ? Math.min(1.0, Math.max(0.6, rh - doorH - 0.3)) : 0;
+      const yPos = item.type === "door" ? doorH / 2 : sill + doorH / 2;
+      const insetVal = wallT / 2 + 0.015;
+      let pos, rot;
+
+      if (wallId === "front") {
+        pos = [offset, yPos, rw / 2 + insetVal];
+        rot = [0, 0, 0];
+      } else if (wallId === "back") {
+        pos = [offset, yPos, -rw / 2 - insetVal];
+        rot = [0, Math.PI, 0];
+      } else if (wallId === "left") {
+        pos = [-rl / 2 - insetVal, yPos, offset];
+        rot = [0, -Math.PI / 2, 0];
+      } else if (wallId === "right") {
+        pos = [rl / 2 + insetVal, yPos, offset];
+        rot = [0, Math.PI / 2, 0];
+      } else return;
+
+      pos[1] += yOffset;
+
+      placedOpenings.push({
+        opening: item,
+        position: [pos[0] + cx, pos[1], pos[2] + cz],
+        rotation: rot,
+        width: doorW,
+        height: doorH,
+        sill,
+      });
+    });
+  });
+
+  const sideWalls = room.sideWalls || [];
+
+  return (
+    <Fragment key={room.id ?? index}>
+      {/* Room floor label */}
+      <Text
+        position={[cx, yOffset + 0.05, cz]}
+        fontSize={0.25}
+        color="#f5a623"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.02}
+        outlineColor="#000"
+      >
+        {room.label || `Room ${index + 1}`}
+      </Text>
+
+      {/* 4 walls — skip walls shared with parent building */}
+      {!sideWalls.includes("front") && <Panel position={[cx, yOffset + rh / 2, cz + rw / 2]} size={[rl, rh, wallT]} color={color} panelWidth={pw} />}
+      {!sideWalls.includes("back") && <Panel position={[cx, yOffset + rh / 2, cz - rw / 2]} rotation={[0, Math.PI, 0]} size={[rl, rh, wallT]} color={color} panelWidth={pw} />}
+      {!sideWalls.includes("left") && <Panel position={[cx - rl / 2, yOffset + rh / 2, cz]} rotation={[0, -Math.PI / 2, 0]} size={[rw, rh, wallT]} color={color} panelWidth={pw} />}
+      {!sideWalls.includes("right") && <Panel position={[cx + rl / 2, yOffset + rh / 2, cz]} rotation={[0, Math.PI / 2, 0]} size={[rw, rh, wallT]} color={color} panelWidth={pw} />}
+
+      {/* Ceiling */}
+      {room.showCeiling && (
+        <Panel position={[cx, yOffset + rh + wallT / 2, cz]} rotation={[Math.PI / 2, 0, 0]}
+          size={[rl, rw, wallT]} color={color} panelWidth={pw} />
+      )}
+
+      {/* Corner trims */}
+      {[
+        [-rl/2, rw/2], [rl/2, rw/2], [-rl/2, -rw/2], [rl/2, -rw/2]
+      ].map(([x, z], i) => (
+        <CornerTrim key={`trim-${index}-${i}`} position={[cx + x, yOffset + rh / 2, cz + z]} height={rh} />
+      ))}
+
+      {/* Doors & windows */}
+      {placedOpenings.map(({ opening, position, rotation, width: w, height: h, sill }, i) =>
+        opening.type === "door" ? (
+          <Fragment key={opening.id ?? `rd-${index}-${i}`}>
+            <Door position={position} rotation={rotation} doorWidth={w} doorHeight={h} color={color} thickness={wallT} />
+            <Text position={[position[0], position[1] + h / 2 + 0.2, position[2]]}
+              rotation={[0, rotation[1], 0]} fontSize={0.18} color="#f5a623"
+              anchorX="center" anchorY="middle" outlineWidth={0.015} outlineColor="#000">
+              {opening.label || `Door`}
+            </Text>
+          </Fragment>
+        ) : (
+          <Fragment key={opening.id ?? `rw-${index}-${i}`}>
+            <Window position={position} rotation={rotation} windowWidth={w} windowHeight={h} sillHeight={sill} thickness={wallT} />
+            <Text position={[position[0], position[1] + h / 2 + 0.2, position[2]]}
+              rotation={[0, rotation[1], 0]} fontSize={0.18} color="#64b5f6"
+              anchorX="center" anchorY="middle" outlineWidth={0.015} outlineColor="#000">
+              {opening.label || `Window`}
+            </Text>
+          </Fragment>
+        )
+      )}
+
+      {/* Room label above */}
+      <Text position={[cx, yOffset + rh + 0.4, cz]} fontSize={0.22} color="#ffd54f"
+        anchorX="center" anchorY="middle" outlineWidth={0.015} outlineColor="#000">
+        {room.label || `Room ${index + 1}`}
+      </Text>
+    </Fragment>
+  );
+}
+
 // ─── 3D Scene ─────────────────────────────────────────────────────────────────
 function Scene({ length, width, floors, showRoof, unit, panelType }) {
   const floorHeights = floors.map(f => toM(parseFloat(f.height) || 4, unit));
@@ -193,8 +420,8 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
   const allDoors = floors.flatMap(f => (f.openings || []).filter(o => o.type === "door")).length;
   const allWindows = floors.flatMap(f => (f.openings || []).filter(o => o.type === "window")).length;
   const allPartitions = floors.reduce((s, f) => s + (f.partitions || []).length, 0);
+  const allRooms = floors.reduce((s, f) => s + (f.internalRooms || []).length, 0);
 
-  // Build floor 3D elements with y-offsets
   let yOffset = 0;
   const floorElements = [];
 
@@ -254,155 +481,80 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
 
     floorElements.push(
       <Fragment key={floor.id ?? fi}>
-        {/* Floor slab between stories (except ground) */}
         {fi > 0 && <FloorSlab length={length} width={width} position={[0, yOffset, 0]} />}
 
         {/* Outer walls */}
         {showWalls && (
           <>
-            <Panel
-              position={[0, yOffset + floorH / 2, width / 2]}
-              size={[length, floorH, wallT]}
-              color={color}
-              panelWidth={pw}
-            />
-            <Panel
-              position={[0, yOffset + floorH / 2, -width / 2]}
-              rotation={[0, Math.PI, 0]}
-              size={[length, floorH, wallT]}
-              color={color}
-              panelWidth={pw}
-            />
-            <Panel
-              position={[-length / 2, yOffset + floorH / 2, 0]}
-              rotation={[0, -Math.PI / 2, 0]}
-              size={[width, floorH, wallT]}
-              color={color}
-              panelWidth={pw}
-            />
-            <Panel
-              position={[length / 2, yOffset + floorH / 2, 0]}
-              rotation={[0, Math.PI / 2, 0]}
-              size={[width, floorH, wallT]}
-              color={color}
-              panelWidth={pw}
-            />
+            <Panel position={[0, yOffset + floorH / 2, width / 2]} size={[length, floorH, wallT]} color={color} panelWidth={pw} />
+            <Panel position={[0, yOffset + floorH / 2, -width / 2]} rotation={[0, Math.PI, 0]} size={[length, floorH, wallT]} color={color} panelWidth={pw} />
+            <Panel position={[-length / 2, yOffset + floorH / 2, 0]} rotation={[0, -Math.PI / 2, 0]} size={[width, floorH, wallT]} color={color} panelWidth={pw} />
+            <Panel position={[length / 2, yOffset + floorH / 2, 0]} rotation={[0, Math.PI / 2, 0]} size={[width, floorH, wallT]} color={color} panelWidth={pw} />
           </>
         )}
 
-        {/* Internal partitions */}
+        {/* Partitions */}
         {showWalls &&
           partitionLayouts.map(({ partition, index, wallLen, wallH, z }) => (
             <Fragment key={partition.id ?? index}>
-              <Panel
-                position={[0, yOffset + wallH / 2, z]}
-                size={[wallLen, wallH, wallT]}
-                color="#dce8e0"
-                panelWidth={pw}
-              />
-              <Text
-                position={[0, yOffset + wallH + 0.35, z]}
-                fontSize={0.28}
-                color="#3ec47e"
-                anchorX="center"
-                anchorY="middle"
-                outlineWidth={0.02}
-                outlineColor="#000"
-              >
+              <Panel position={[0, yOffset + wallH / 2, z]} size={[wallLen, wallH, wallT]} color="#dce8e0" panelWidth={pw} />
+              <Text position={[0, yOffset + wallH + 0.35, z]} fontSize={0.28} color="#3ec47e"
+                anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000">
                 {`${floor.label || `F${fi + 1}`} P${index + 1}: ${partition.label || `Partition ${index + 1}`}`}
               </Text>
             </Fragment>
           ))}
 
+        {/* Internal Rooms */}
+        {showWalls && (floor.internalRooms || []).map((rm, ri) => (
+          <InternalRoom3D
+            key={rm.id ?? ri}
+            room={rm} index={ri}
+            floorHeight={floorH}
+            yOffset={yOffset}
+            unit={unit}
+            length={length}
+            width={width}
+          />
+        ))}
+
         {/* Roof */}
         {showRoofPanel && (
-          <Panel
-            position={[0, yOffset + floorH + roofT / 2, 0]}
-            rotation={[Math.PI / 2, 0, 0]}
-            size={[length, width, roofT]}
-            color={color}
-            panelWidth={pw}
-          />
+          <Panel position={[0, yOffset + floorH + roofT / 2, 0]} rotation={[Math.PI / 2, 0, 0]}
+            size={[length, width, roofT]} color={color} panelWidth={pw} />
         )}
 
         {/* Corner trims */}
         {showWalls &&
-          [
-            [-length / 2, width / 2],
-            [length / 2, width / 2],
-            [-length / 2, -width / 2],
-            [length / 2, -width / 2],
-          ].map(([x, z], i) => (
-            <CornerTrim
-              key={`trim-${fi}-${i}`}
-              position={[x, yOffset + floorH / 2, z]}
-              height={floorH}
-            />
-          ))}
+          [[-length/2, width/2], [length/2, width/2], [-length/2, -width/2], [length/2, -width/2]]
+            .map(([x, z], i) => (
+              <CornerTrim key={`trim-${fi}-${i}`} position={[x, yOffset + floorH / 2, z]} height={floorH} />
+            ))}
 
         {/* Doors & windows */}
-        {showWalls &&
-          placedOpenings.map(
-            ({ opening, position, rotation, width: w, height: h, sill }, i) =>
-              opening.type === "door" ? (
-                <Fragment key={opening.id ?? `d-${fi}-${i}`}>
-                  <Door
-                    position={position}
-                    rotation={rotation}
-                    doorWidth={w}
-                    doorHeight={h}
-                    color={color}
-                    thickness={wallT}
-                  />
-                  <Text
-                    position={[position[0], yOffset + h + 0.25, position[2]]}
-                    rotation={[0, rotation[1], 0]}
-                    fontSize={0.22}
-                    color="#f5a623"
-                    anchorX="center"
-                    anchorY="middle"
-                    outlineWidth={0.02}
-                    outlineColor="#000"
-                  >
-                    {`${floor.label || `F${fi + 1}`} ${opening.label || `Door ${i + 1}`}`}
-                  </Text>
-                </Fragment>
-              ) : (
-                <Fragment key={opening.id ?? `w-${fi}-${i}`}>
-                  <Window
-                    position={position}
-                    rotation={rotation}
-                    windowWidth={w}
-                    windowHeight={h}
-                    sillHeight={sill}
-                    thickness={wallT}
-                  />
-                  <Text
-                    position={[position[0], yOffset + sill + h + 0.25, position[2]]}
-                    rotation={[0, rotation[1], 0]}
-                    fontSize={0.22}
-                    color="#64b5f6"
-                    anchorX="center"
-                    anchorY="middle"
-                    outlineWidth={0.02}
-                    outlineColor="#000"
-                  >
-                    {`${floor.label || `F${fi + 1}`} ${opening.label || `Window ${i + 1}`}`}
-                  </Text>
-                </Fragment>
-              )
-          )}
+        {showWalls && placedOpenings.map(({ opening, position, rotation, width: w, height: h, sill }, i) =>
+          opening.type === "door" ? (
+            <Fragment key={opening.id ?? `d-${fi}-${i}`}>
+              <Door position={position} rotation={rotation} doorWidth={w} doorHeight={h} color={color} thickness={wallT} />
+              <Text position={[position[0], yOffset + h + 0.25, position[2]]} rotation={[0, rotation[1], 0]}
+                fontSize={0.22} color="#f5a623" anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000">
+                {`${floor.label || `F${fi + 1}`} ${opening.label || `Door ${i + 1}`}`}
+              </Text>
+            </Fragment>
+          ) : (
+            <Fragment key={opening.id ?? `w-${fi}-${i}`}>
+              <Window position={position} rotation={rotation} windowWidth={w} windowHeight={h} sillHeight={sill} thickness={wallT} />
+              <Text position={[position[0], yOffset + sill + h + 0.25, position[2]]} rotation={[0, rotation[1], 0]}
+                fontSize={0.22} color="#64b5f6" anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000">
+                {`${floor.label || `F${fi + 1}`} ${opening.label || `Window ${i + 1}`}`}
+              </Text>
+            </Fragment>
+          )
+        )}
 
         {/* Floor label */}
-        <Text
-          position={[length / 2 + 1, yOffset + floorH / 2, 0]}
-          fontSize={0.35}
-          color="#f5a623"
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.02}
-          outlineColor="#000"
-        >
+        <Text position={[length / 2 + 1, yOffset + floorH / 2, 0]}
+          fontSize={0.35} color="#f5a623" anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000">
           {floor.label || `Floor ${fi + 1}`}
         </Text>
       </Fragment>
@@ -415,66 +567,31 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
     <>
       <color attach="background" args={["#0d1f16"]} />
       <ambientLight intensity={0.55} />
-      <directionalLight
-        position={[20, 25, 15]}
-        intensity={2.0}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-      />
+      <directionalLight position={[20, 25, 15]} intensity={2.0} castShadow
+        shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
       <directionalLight position={[-15, 10, -10]} intensity={0.5} />
       <pointLight position={[0, 50, 0]} intensity={0.3} color="#d9f0e6" />
 
-      <OrbitControls
-        makeDefault
-        target={[0, totalBuildingHeight / 2, 0]}
-        minDistance={3}
-        maxDistance={100}
-        maxPolarAngle={Math.PI / 2.05}
-      />
+      <OrbitControls makeDefault target={[0, totalBuildingHeight / 2, 0]}
+        minDistance={3} maxDistance={100} maxPolarAngle={Math.PI / 2.05} />
 
-      <Grid
-        position={[0, 0, 0]}
-        args={[200, 200]}
-        cellSize={1}
-        cellThickness={0.4}
-        cellColor="#1f6e43"
-        sectionSize={5}
-        sectionThickness={1}
-        sectionColor="#0a3b2f"
-        fadeDistance={80}
-        infiniteGrid
-      />
+      <Grid position={[0, 0, 0]} args={[200, 200]}
+        cellSize={1} cellThickness={0.4} cellColor="#1f6e43"
+        sectionSize={5} sectionThickness={1} sectionColor="#0a3b2f"
+        fadeDistance={80} infiniteGrid />
 
-      {/* Ground slab */}
       <FloorSlab length={length} width={width} />
-
-      {/* All floor elements */}
       {floorElements}
 
-      {/* Summary counts */}
-      <Text
-        position={[-length / 2 - 0.8, totalBuildingHeight + 0.6, 0]}
-        fontSize={0.32}
-        color="#ffffff"
-        anchorX="left"
-        anchorY="middle"
-        outlineWidth={0.025}
-        outlineColor="#000"
-      >
-        {`Floors: ${floors.length}  |  Partitions: ${allPartitions}  |  Doors: ${allDoors}  |  Windows: ${allWindows}`}
+      <Text position={[-length / 2 - 0.8, totalBuildingHeight + 0.6, 0]}
+        fontSize={0.32} color="#ffffff" anchorX="left" anchorY="middle"
+        outlineWidth={0.025} outlineColor="#000">
+        {`Floors: ${floors.length}  |  Rooms: ${allRooms}  |  Partitions: ${allPartitions}  |  Doors: ${allDoors}  |  Windows: ${allWindows}`}
       </Text>
 
-      {/* Dimension text */}
-      <Text
-        position={[0, totalBuildingHeight + 1.5, width / 2 + 0.5]}
-        fontSize={0.45}
-        color="#f5a623"
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.03}
-        outlineColor="#000"
-      >
+      <Text position={[0, totalBuildingHeight + 1.5, width / 2 + 0.5]}
+        fontSize={0.45} color="#f5a623" anchorX="center" anchorY="middle"
+        outlineWidth={0.03} outlineColor="#000">
         {unit === "ft"
           ? `${fmt(length, "ft", 1)}ft × ${fmt(width, "ft", 1)}ft × ${fmt(totalBuildingHeight, "ft", 1)}ft`
           : `${fmt(length, "m")}m × ${fmt(width, "m")}m × ${fmt(totalBuildingHeight, "m")}m`}
@@ -488,10 +605,8 @@ function StepIndicator({ current }) {
   return (
     <div className="step-indicator">
       {STEPS.map(s => (
-        <div
-          key={s.id}
-          className={`step-dot ${current === s.id ? "active" : current > s.id ? "done" : ""}`}
-        >
+        <div key={s.id}
+          className={`step-dot ${current === s.id ? "active" : current > s.id ? "done" : ""}`}>
           <span className="dot">{current > s.id ? "✓" : s.id}</span>
           <span className="step-label">{s.label}</span>
         </div>
@@ -506,30 +621,54 @@ function FloorSelector({ floors, currentFloorId, onSelectFloor, onAddFloor, onRe
     <div className="floor-selector">
       <div className="floor-tabs">
         {floors.map((f, i) => (
-          <button
-            key={f.id}
+          <button key={f.id}
             className={`floor-tab ${f.id === currentFloorId ? "active" : ""}`}
-            onClick={() => onSelectFloor(f.id)}
-          >
+            onClick={() => onSelectFloor(f.id)}>
             <span className="floor-tab-color" style={{ background: f.panelColor || "#f5f5f5" }} />
             <span>{f.label || `Floor ${i + 1}`}</span>
             {floors.length > 1 && (
-              <span
-                className="floor-remove-tab"
-                onClick={e => {
-                  e.stopPropagation();
-                  onRemoveFloor(f.id);
-                }}
-              >
-                ✕
-              </span>
+              <span className="floor-remove-tab" onClick={e => { e.stopPropagation(); onRemoveFloor(f.id); }}>✕</span>
             )}
           </button>
         ))}
-        <button className="floor-tab add-floor-tab" onClick={onAddFloor}>
-          + Add Floor
-        </button>
+        <button className="floor-tab add-floor-tab" onClick={onAddFloor}>+ Add Floor</button>
       </div>
+    </div>
+  );
+}
+
+// ─── Room Opening Editor ──────────────────────────────────────────────────────
+function RoomOpeningEditor({ openings, onAdd, onRemove, onUpdate, displayUnit, unit }) {
+  return (
+    <div className="room-openings-section">
+      <div className="section-subheading">🚪 Room Openings</div>
+      {openings.length === 0 && <div className="empty-hint-sm">No openings for this room. Add a door or window.</div>}
+      {openings.map((o, i) => (
+        <div key={o.id} className="room-opening-row">
+          <div className="room-opening-header">
+            <span>{o.type === "door" ? "🚪" : "🪟"} {o.label || `Opening ${i + 1}`}</span>
+            <button className="remove-btn-xs" onClick={() => onRemove(o.id)}>✕</button>
+          </div>
+          <div className="room-opening-fields">
+            <select value={o.type} onChange={e => onUpdate(o.id, "type", e.target.value)}>
+              <option value="door">Door</option>
+              <option value="window">Window</option>
+            </select>
+            <select value={o.wall} onChange={e => onUpdate(o.id, "wall", e.target.value)}>
+              {WALL_OPTIONS.map(wo => <option key={wo.value} value={wo.value}>{wo.label}</option>)}
+            </select>
+            <input type="number" min={0.3} max={unit === "ft" ? 8 : 2.5} step={0.1}
+              value={o.width} onChange={e => onUpdate(o.id, "width", e.target.value)}
+              placeholder={`W (${displayUnit})`} />
+            <input type="number" min={0.3} max={unit === "ft" ? 8 : 2.5} step={0.1}
+              value={o.height} onChange={e => onUpdate(o.id, "height", e.target.value)}
+              placeholder={`H (${displayUnit})`} />
+            <input type="text" value={o.label} onChange={e => onUpdate(o.id, "label", e.target.value)}
+              placeholder="Label" className="room-label-input" />
+          </div>
+        </div>
+      ))}
+      <button className="btn btn-outline full-width add-btn-sm" onClick={onAdd}>+ Add Door/Window</button>
     </div>
   );
 }
@@ -539,35 +678,31 @@ export default function App() {
   const [step, setStep] = useState(1);
   const [unit, setUnit] = useState("m");
 
-  // Global Structure
   const [structureType, setStructureType] = useState("coldroom");
   const [length, setLength] = useState(10);
   const [width, setWidth] = useState(8);
 
-  // Floors state
   const [floors, setFloors] = useState(() => [createDefaultFloor(Date.now(), "m", 0)]);
   const [currentFloorId, setCurrentFloorId] = useState(() => floors[0]?.id);
 
-  // Global panel config
   const [panelType, setPanelType] = useState("both");
   const [showRoof, setShowRoof] = useState(true);
 
-  // Quote modal
   const [quoteOpen, setQuoteOpen] = useState(false);
 
-  // Derived
+  const [showRoomMaker, setShowRoomMaker] = useState(false);
+  const [editingRoomId, setEditingRoomId] = useState(null);
+
   const currentFloor = floors.find(f => f.id === currentFloorId) || floors[0];
   const totalHeightM = floors.reduce((s, f) => s + toM(parseFloat(f.height) || 4, unit), 0);
   const lengthM = toM(length, unit);
   const widthM = toM(width, unit);
 
-  // Live calculation
   const calc = useMemo(
     () => calculate({ length: lengthM, width: widthM, floors, panelType, showRoof, unit }),
     [lengthM, widthM, floors, panelType, showRoof, unit]
   );
 
-  // Floor CRUD
   const addFloor = () => {
     const newFloor = createDefaultFloor(Date.now(), unit, floors.length);
     setFloors(prev => [...prev, newFloor]);
@@ -578,9 +713,7 @@ export default function App() {
     if (floors.length <= 1) return;
     setFloors(prev => {
       const filtered = prev.filter(f => f.id !== id);
-      if (currentFloorId === id && filtered.length > 0) {
-        setCurrentFloorId(filtered[filtered.length - 1].id);
-      }
+      if (currentFloorId === id && filtered.length > 0) setCurrentFloorId(filtered[filtered.length - 1].id);
       return filtered;
     });
   };
@@ -589,10 +722,11 @@ export default function App() {
     setFloors(prev => prev.map(f => (f.id === id ? { ...f, [field]: val } : f)));
   };
 
-  // Current floor helpers
   const currentPartitions = currentFloor?.partitions || [];
   const currentOpenings = currentFloor?.openings || [];
+  const currentRooms = currentFloor?.internalRooms || [];
 
+  // ── Partition CRUD ──
   const addPartition = () => {
     const defaultLen = unit === "ft" ? "16" : "5";
     const defaultH = unit === "ft" ? "13.1" : "4";
@@ -602,18 +736,13 @@ export default function App() {
     ]);
   };
 
-  const removePartition = id => {
-    updateFloor(currentFloorId, "partitions", currentPartitions.filter(x => x.id !== id));
-  };
+  const removePartition = id => updateFloor(currentFloorId, "partitions", currentPartitions.filter(x => x.id !== id));
 
   const updatePartition = (id, field, val) => {
-    updateFloor(
-      currentFloorId,
-      "partitions",
-      currentPartitions.map(x => (x.id === id ? { ...x, [field]: val } : x))
-    );
+    updateFloor(currentFloorId, "partitions", currentPartitions.map(x => (x.id === id ? { ...x, [field]: val } : x)));
   };
 
+  // ── Opening CRUD (building) ──
   const addOpening = () => {
     const dw = unit === "ft" ? "4.0" : "1.2";
     const dh = unit === "ft" ? "7.0" : "2.1";
@@ -623,18 +752,55 @@ export default function App() {
     ]);
   };
 
-  const removeOpening = id => {
-    updateFloor(currentFloorId, "openings", currentOpenings.filter(x => x.id !== id));
-  };
+  const removeOpening = id => updateFloor(currentFloorId, "openings", currentOpenings.filter(x => x.id !== id));
 
   const updateOpening = (id, field, val) => {
-    updateFloor(
-      currentFloorId,
-      "openings",
-      currentOpenings.map(x => (x.id === id ? { ...x, [field]: val } : x))
+    updateFloor(currentFloorId, "openings", currentOpenings.map(x => (x.id === id ? { ...x, [field]: val } : x)));
+  };
+
+  // ── Internal Room CRUD ──
+  const addRoom = () => {
+    const newRoom = createDefaultRoom(Date.now(), unit);
+    updateFloor(currentFloorId, "internalRooms", [...currentRooms, newRoom]);
+    setEditingRoomId(newRoom.id);
+    setShowRoomMaker(true);
+  };
+
+  const removeRoom = id => {
+    updateFloor(currentFloorId, "internalRooms", currentRooms.filter(r => r.id !== id));
+    if (editingRoomId === id) setEditingRoomId(null);
+  };
+
+  const updateRoom = (id, field, val) => {
+    updateFloor(currentFloorId, "internalRooms", currentRooms.map(r => (r.id === id ? { ...r, [field]: val } : r)));
+  };
+
+  // ── Room Opening CRUD ──
+  const currentEditingRoom = currentRooms.find(r => r.id === editingRoomId);
+
+  const addRoomOpening = () => {
+    if (!currentEditingRoom) return;
+    const dw = unit === "ft" ? "3.0" : "0.9";
+    const dh = unit === "ft" ? "6.5" : "2.0";
+    updateRoom(editingRoomId, "openings", [
+      ...(currentEditingRoom.openings || []),
+      { id: Date.now(), type: "door", wall: "front", width: dw, height: dh, label: "Room Door" },
+    ]);
+  };
+
+  const removeRoomOpening = (opId) => {
+    if (!currentEditingRoom) return;
+    updateRoom(editingRoomId, "openings", (currentEditingRoom.openings || []).filter(o => o.id !== opId));
+  };
+
+  const updateRoomOpening = (opId, field, val) => {
+    if (!currentEditingRoom) return;
+    updateRoom(editingRoomId, "openings",
+      (currentEditingRoom.openings || []).map(o => (o.id === opId ? { ...o, [field]: val } : o))
     );
   };
 
+  // ── Navigation ──
   const next = () => setStep(s => Math.min(s + 1, 6));
   const prev = () => setStep(s => Math.max(s - 1, 1));
 
@@ -643,22 +809,30 @@ export default function App() {
       const newUnit = u === "m" ? "ft" : "m";
       setLength(v => fromM(v, newUnit));
       setWidth(v => fromM(v, newUnit));
-      setFloors(prev =>
-        prev.map(f => ({
-          ...f,
-          height: String(fromM(parseFloat(f.height) || 0, newUnit)),
-          partitions: (f.partitions || []).map(p => ({
-            ...p,
-            length: String(fromM(parseFloat(p.length) || 0, newUnit)),
-            height: String(fromM(parseFloat(p.height) || 0, newUnit)),
-          })),
-          openings: (f.openings || []).map(o => ({
-            ...o,
-            width: String(fromM(parseFloat(o.width) || 0, newUnit)),
+      setFloors(prev => prev.map(f => ({
+        ...f,
+        height: String(fromM(parseFloat(f.height) || 0, newUnit)),
+        partitions: (f.partitions || []).map(p => ({
+          ...p, length: String(fromM(parseFloat(p.length) || 0, newUnit)),
+          height: String(fromM(parseFloat(p.height) || 0, newUnit)),
+        })),
+        openings: (f.openings || []).map(o => ({
+          ...o, width: String(fromM(parseFloat(o.width) || 0, newUnit)),
+          height: String(fromM(parseFloat(o.height) || 0, newUnit)),
+        })),
+        internalRooms: (f.internalRooms || []).map(r => ({
+          ...r,
+          positionX: String(fromM(parseFloat(r.positionX) || 0, newUnit)),
+          positionZ: String(fromM(parseFloat(r.positionZ) || 0, newUnit)),
+          roomLength: String(fromM(parseFloat(r.roomLength) || 3, newUnit)),
+          roomWidth: String(fromM(parseFloat(r.roomWidth) || 2.5, newUnit)),
+          roomHeight: String(fromM(parseFloat(r.roomHeight) || 2.4, newUnit)),
+          openings: (r.openings || []).map(o => ({
+            ...o, width: String(fromM(parseFloat(o.width) || 0, newUnit)),
             height: String(fromM(parseFloat(o.height) || 0, newUnit)),
           })),
-        }))
-      );
+        })),
+      })));
       return newUnit;
     });
   };
@@ -666,25 +840,21 @@ export default function App() {
   const displayUnit = unit === "m" ? "m" : "ft";
   const areaUnitLabel = unit === "m" ? "m²" : "sq. ft";
 
-  const doorCount = floors.reduce((s, f) => s + (f.openings || []).filter(o => o.type === "door").length, 0);
-  const windowCount = floors.reduce((s, f) => s + (f.openings || []).filter(o => o.type === "window").length, 0);
+  const doorCount = floors.reduce((s, f) => s + (f.openings || []).filter(o => o.type === "door").length + (f.internalRooms || []).reduce((rs, r) => rs + (r.openings || []).filter(o => o.type === "door").length, 0), 0);
+  const windowCount = floors.reduce((s, f) => s + (f.openings || []).filter(o => o.type === "window").length + (f.internalRooms || []).reduce((rs, r) => rs + (r.openings || []).filter(o => o.type === "window").length, 0), 0);
   const partitionCount = floors.reduce((s, f) => s + (f.partitions || []).length, 0);
+  const roomCount = floors.reduce((s, f) => s + (f.internalRooms || []).length, 0);
 
   return (
     <div className="app-layout">
-      {/* ─── SIDEBAR ─────────────────────────────────────────── */}
       <aside className="sidebar">
         <div className="sidebar-inner">
-          {/* Brand */}
           <div className="brand">
             <div className="brand-logo">ESSARFAB</div>
             <div className="brand-subtitle">PUF Panel Calculator & 3D Builder</div>
-            <a className="back-link" href="../../index.html">
-              ← Back to Website
-            </a>
+            <a className="back-link" href="../../index.html">← Back to Website</a>
           </div>
 
-          {/* Step Indicator */}
           <StepIndicator current={step} />
 
           {/* ════ STEP 1 — STRUCTURE ════ */}
@@ -696,18 +866,8 @@ export default function App() {
               <div className="unit-toggle">
                 <span className="field-label">Unit System</span>
                 <div className="unit-btns">
-                  <button
-                    className={`unit-btn${unit === "m" ? " active" : ""}`}
-                    onClick={() => unit !== "m" && toggleUnit()}
-                  >
-                    Metric (m)
-                  </button>
-                  <button
-                    className={`unit-btn${unit === "ft" ? " active" : ""}`}
-                    onClick={() => unit !== "ft" && toggleUnit()}
-                  >
-                    Imperial (ft)
-                  </button>
+                  <button className={`unit-btn${unit === "m" ? " active" : ""}`} onClick={() => unit !== "m" && toggleUnit()}>Metric (m)</button>
+                  <button className={`unit-btn${unit === "ft" ? " active" : ""}`} onClick={() => unit !== "ft" && toggleUnit()}>Imperial (ft)</button>
                 </div>
               </div>
 
@@ -715,348 +875,241 @@ export default function App() {
                 <span className="field-label">Structure Type</span>
                 {STRUCTURE_TYPES.map(s => (
                   <label key={s.value} className="radio-label">
-                    <input
-                      type="radio"
-                      name="st"
-                      value={s.value}
-                      checked={structureType === s.value}
-                      onChange={() => setStructureType(s.value)}
-                    />
+                    <input type="radio" name="st" value={s.value}
+                      checked={structureType === s.value} onChange={() => setStructureType(s.value)} />
                     {s.label}
                   </label>
                 ))}
               </div>
 
               <div className="dim-row">
-                <label>
-                  Length ({displayUnit})
-                  <input
-                    type="number"
-                    min={1}
-                    max={unit === "ft" ? 330 : 100}
-                    step={0.5}
-                    value={length}
-                    onChange={e => setLength(Math.max(1, parseFloat(e.target.value) || 1))}
-                  />
+                <label>Length ({displayUnit})
+                  <input type="number" min={1} max={unit === "ft" ? 330 : 100} step={0.5} value={length}
+                    onChange={e => setLength(Math.max(1, parseFloat(e.target.value) || 1))} />
                 </label>
-                <label>
-                  Width ({displayUnit})
-                  <input
-                    type="number"
-                    min={1}
-                    max={unit === "ft" ? 330 : 100}
-                    step={0.5}
-                    value={width}
-                    onChange={e => setWidth(Math.max(1, parseFloat(e.target.value) || 1))}
-                  />
+                <label>Width ({displayUnit})
+                  <input type="number" min={1} max={unit === "ft" ? 330 : 100} step={0.5} value={width}
+                    onChange={e => setWidth(Math.max(1, parseFloat(e.target.value) || 1))} />
                 </label>
               </div>
 
-              {/* Floor management */}
               <div className="floor-management">
                 <span className="field-label">Floors</span>
                 {floors.map((f, i) => (
                   <div key={f.id} className="floor-item">
                     <div className="floor-item-header">
                       <span className="floor-item-label">
-                        <span
-                          className="floor-color-dot"
-                          style={{ background: f.panelColor || "#f5f5f5" }}
-                        />
+                        <span className="floor-color-dot" style={{ background: f.panelColor || "#f5f5f5" }} />
                         {f.label || `Floor ${i + 1}`}
                       </span>
-                      {floors.length > 1 && (
-                        <button className="remove-btn-sm" onClick={() => removeFloor(f.id)}>
-                          ✕
-                        </button>
-                      )}
+                      {floors.length > 1 && <button className="remove-btn-sm" onClick={() => removeFloor(f.id)}>✕</button>}
                     </div>
                     <div className="dim-row floor-dim-row">
-                      <label>
-                        Height ({displayUnit})
-                        <input
-                          type="number"
-                          min={1}
-                          max={unit === "ft" ? 50 : 15}
-                          step={0.1}
-                          value={f.height}
-                          onChange={e =>
-                            updateFloor(f.id, "height", String(Math.max(1, parseFloat(e.target.value) || 1)))
-                          }
-                        />
+                      <label>Height ({displayUnit})
+                        <input type="number" min={1} max={unit === "ft" ? 50 : 15} step={0.1} value={f.height}
+                          onChange={e => updateFloor(f.id, "height", String(Math.max(1, parseFloat(e.target.value) || 1)))} />
                       </label>
-                      <label className="floor-color-select">
-                        Color
+                      <label className="floor-color-select">Color
                         <div className="floor-color-options">
                           {COLOR_OPTIONS.map(c => (
-                            <button
-                              key={c.hex}
-                              title={c.name}
+                            <button key={c.hex} title={c.name}
                               className={`mini-swatch${f.panelColor === c.hex ? " active" : ""}`}
-                              style={{ background: c.hex }}
-                              onClick={() => updateFloor(f.id, "panelColor", c.hex)}
-                            />
+                              style={{ background: c.hex }} onClick={() => updateFloor(f.id, "panelColor", c.hex)} />
                           ))}
                         </div>
                       </label>
                     </div>
                   </div>
                 ))}
-                <button
-                  className="btn btn-outline full-width add-btn"
-                  onClick={addFloor}
-                  style={{ marginTop: "6px" }}
-                >
-                  + Add Another Floor
-                </button>
+                <button className="btn btn-outline full-width add-btn" onClick={addFloor} style={{marginTop:"6px"}}>+ Add Another Floor</button>
               </div>
 
               <div className="dim-summary">
-                <span>
-                  Floors: <strong>{floors.length}</strong>
-                </span>
-                <span>
-                  Total Height: <strong>{fmt(totalHeightM, "m", 1)} m{unit === "ft" ? ` / ${fmt(totalHeightM, "ft", 1)} ft` : ""}</strong>
-                </span>
-                <span>
-                  Floor Area: <strong>{(lengthM * widthM).toFixed(1)} m²{unit === "ft" ? ` / ${(length * width).toFixed(1)} sq.ft` : ""}</strong>
-                </span>
+                <span>Floors: <strong>{floors.length}</strong></span>
+                <span>Total Height: <strong>{fmt(totalHeightM, "m", 1)} m{unit === "ft" ? ` / ${fmt(totalHeightM, "ft", 1)} ft` : ""}</strong></span>
+                <span>Floor Area: <strong>{(lengthM * widthM).toFixed(1)} m²{unit === "ft" ? ` / ${(length * width).toFixed(1)} sq.ft` : ""}</strong></span>
               </div>
             </div>
           )}
 
           {/* ════ STEPS 2-5 — FLOOR SELECTOR ════ */}
           {step >= 2 && step <= 5 && (
-            <FloorSelector
-              floors={floors}
-              currentFloorId={currentFloorId}
-              onSelectFloor={setCurrentFloorId}
-              onAddFloor={addFloor}
-              onRemoveFloor={removeFloor}
-            />
+            <FloorSelector floors={floors} currentFloorId={currentFloorId}
+              onSelectFloor={setCurrentFloorId} onAddFloor={addFloor} onRemoveFloor={removeFloor} />
           )}
 
-          {/* ════ STEP 2 — PARTITIONS ════ */}
+          {/* ════ STEP 2 — PARTITIONS + ROOMS ════ */}
           {step === 2 && (
             <div className="step-content">
-              <div className="step-title">Step 2: Internal Partitions</div>
+              <div className="step-title">Step 2: Partitions & Internal Rooms</div>
               <p className="step-desc">
-                Configure partitions for <strong>{currentFloor?.label || "current floor"}</strong>.
-                Skip if none.
+                Configure walls and rooms inside <strong>{currentFloor?.label || "current floor"}</strong>.
               </p>
 
-              {currentPartitions.length === 0 && (
-                <div className="empty-hint">No partitions added yet. Click below to add one.</div>
-              )}
-
+              {/* ── Partitions ── */}
+              <div className="section-subheading">🧱 Partition Walls</div>
+              {currentPartitions.length === 0 && <div className="empty-hint">No partitions yet. Add a dividing wall.</div>}
               {currentPartitions.map((p, i) => (
                 <div className="partition-row" key={p.id}>
                   <div className="partition-row-header">
                     <span className="partition-number">Partition {i + 1}</span>
-                    <button className="remove-btn" onClick={() => removePartition(p.id)}>
-                      ✕
-                    </button>
+                    <button className="remove-btn" onClick={() => removePartition(p.id)}>✕</button>
                   </div>
                   <div className="dim-row">
-                    <label>
-                      Label
-                      <input
-                        type="text"
-                        value={p.label}
-                        onChange={e => updatePartition(p.id, "label", e.target.value)}
-                        placeholder="e.g. Room Divider"
-                      />
-                    </label>
-                    <label>
-                      Length ({displayUnit})
-                      <input
-                        type="number"
-                        min={1}
-                        step={0.5}
-                        value={p.length}
-                        onChange={e => updatePartition(p.id, "length", e.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Height ({displayUnit})
-                      <input
-                        type="number"
-                        min={1}
-                        max={unit === "ft" ? 50 : 15}
-                        step={0.5}
-                        value={p.height}
-                        onChange={e => updatePartition(p.id, "height", e.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <div className="partition-area">
-                    Area:{" "}
-                    <strong>
-                      {(
-                        toM(parseFloat(p.length) || 0, unit) * toM(parseFloat(p.height) || 0, unit)
-                      ).toFixed(2)}{" "}
-                      m²
-                    </strong>
+                    <label>Label <input type="text" value={p.label} onChange={e => updatePartition(p.id, "label", e.target.value)} placeholder="e.g. Room Divider" /></label>
+                    <label>Length ({displayUnit}) <input type="number" min={1} step={0.5} value={p.length} onChange={e => updatePartition(p.id, "length", e.target.value)} /></label>
+                    <label>Height ({displayUnit}) <input type="number" min={1} max={unit === "ft" ? 50 : 15} step={0.5} value={p.height} onChange={e => updatePartition(p.id, "height", e.target.value)} /></label>
                   </div>
                 </div>
               ))}
+              <button className="btn btn-outline full-width add-btn" onClick={addPartition}>+ Add Partition Wall</button>
 
-              <button className="btn btn-outline full-width add-btn" onClick={addPartition}>
-                + Add Partition Wall
-              </button>
+              {/* ── Internal Rooms ── */}
+              <div className="section-divider" />
+              <div className="section-subheading">🏠 Internal PUF Panel Rooms</div>
+              <p className="step-desc" style={{marginTop:"-4px", fontSize:"11px"}}>Build small PUF rooms inside this floor. Each room can have its own doors and windows.</p>
 
-              {currentPartitions.length > 0 && (
-                <div className="dim-summary" style={{ marginTop: "12px" }}>
-                  Total Partition Area:{" "}
-                  <strong>
-                    {currentPartitions
-                      .reduce(
-                        (s, p) =>
-                          s +
-                          toM(parseFloat(p.length) || 0, unit) *
-                            toM(parseFloat(p.height) || 0, unit),
-                        0
-                      )
-                      .toFixed(2)}{" "}
-                    m²
-                  </strong>
+              {currentRooms.length === 0 && <div className="empty-hint">No internal rooms yet. Add a room inside the building.</div>}
+
+              {currentRooms.map((rm, ri) => (
+                <div key={rm.id} className={`partition-row room-card ${editingRoomId === rm.id ? "active" : ""}`}
+                  onClick={() => { setEditingRoomId(rm.id); setShowRoomMaker(true); }}>
+                  <div className="partition-row-header">
+                    <span className="partition-number">🏠 {rm.label || `Room ${ri + 1}`}</span>
+                    <button className="remove-btn" onClick={e => { e.stopPropagation(); removeRoom(rm.id); }}>✕</button>
+                  </div>
+                  <div className="dim-row two-col" style={{fontSize:"11px", color:"var(--text-muted)"}}>
+                    <span>Size: {rm.roomLength}×{rm.roomWidth}×{rm.roomHeight} {displayUnit}</span>
+                    <span>Doors/Windows: {(rm.openings || []).length}</span>
+                  </div>
+                  {editingRoomId === rm.id && showRoomMaker && (
+                    <div className="room-editor" onClick={e => e.stopPropagation()}>
+                      <div className="dim-row two-col">
+                        <label>Label <input type="text" value={rm.label} onChange={e => updateRoom(rm.id, "label", e.target.value)} /></label>
+                        <label>Pos X ({displayUnit}) <input type="number" step={0.1} value={rm.positionX} onChange={e => updateRoom(rm.id, "positionX", e.target.value)} /></label>
+                        <label>Pos Z ({displayUnit}) <input type="number" step={0.1} value={rm.positionZ} onChange={e => updateRoom(rm.id, "positionZ", e.target.value)} /></label>
+                        <label>Length ({displayUnit}) <input type="number" min={0.5} step={0.1} value={rm.roomLength} onChange={e => updateRoom(rm.id, "roomLength", e.target.value)} /></label>
+                        <label>Width ({displayUnit}) <input type="number" min={0.5} step={0.1} value={rm.roomWidth} onChange={e => updateRoom(rm.id, "roomWidth", e.target.value)} /></label>
+                        <label>Height ({displayUnit}) <input type="number" min={0.5} step={0.1} value={rm.roomHeight} onChange={e => updateRoom(rm.id, "roomHeight", e.target.value)} /></label>
+                      </div>
+                      <div className="dim-row two-col">
+                        <label>Color
+                          <div className="floor-color-options" style={{marginTop:"4px"}}>
+                            {COLOR_OPTIONS.map(c => (
+                              <button key={c.hex} title={c.name}
+                                className={`mini-swatch${rm.panelColor === c.hex ? " active" : ""}`}
+                                style={{ background: c.hex }} onClick={() => updateRoom(rm.id, "panelColor", c.hex)} />
+                            ))}
+                          </div>
+                        </label>
+                        <label>Thickness
+                          <select value={rm.wallThickness} onChange={e => updateRoom(rm.id, "wallThickness", Number(e.target.value))}>
+                            <option value={60}>60 mm</option>
+                            <option value={80}>80 mm</option>
+                            <option value={100}>100 mm</option>
+                          </select>
+                        </label>
+                      </div>
+                      <label className="toggle-label" style={{marginTop:"4px"}}>
+                        <input type="checkbox" checked={rm.showCeiling} onChange={e => updateRoom(rm.id, "showCeiling", e.target.checked)} />
+                        Include Ceiling / Roof
+                      </label>
+
+                      {/* ── Side walls (share with parent building) ── */}
+                      <div className="section-subheading">🔗 Shared Walls (no extra panels)</div>
+                      <p style={{fontSize:"10px",color:"var(--text-muted)",margin:"-4px 0 2px",lineHeight:"1.4"}}>
+                        Mark walls that are shared with the parent building's outer walls. Shared walls won't need extra panels.
+                      </p>
+                      <div className="side-walls-grid">
+                        {WALL_OPTIONS.map(wo => {
+                          const isShared = (rm.sideWalls || []).includes(wo.value);
+                          return (
+                            <button key={wo.value}
+                              className={`side-wall-btn${isShared ? " active" : ""}`}
+                              onClick={() => {
+                                const current = rm.sideWalls || [];
+                                const updated = isShared
+                                  ? current.filter(w => w !== wo.value)
+                                  : [...current, wo.value];
+                                updateRoom(rm.id, "sideWalls", updated);
+                              }}>
+                              {wo.label} {isShared ? "✓" : ""}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <RoomOpeningEditor
+                        openings={rm.openings || []}
+                        onAdd={addRoomOpening}
+                        onRemove={removeRoomOpening}
+                        onUpdate={updateRoomOpening}
+                        displayUnit={displayUnit}
+                        unit={unit}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <button className="btn btn-outline full-width add-btn" onClick={addRoom}>+ Add Internal Room</button>
+
+              {currentRooms.length > 0 && (
+                <div className="dim-summary" style={{marginTop:"8px"}}>
+                  <span>Internal Rooms: <strong>{currentRooms.length}</strong></span>
+                  <span>Partitions: <strong>{currentPartitions.length}</strong></span>
                 </div>
               )}
             </div>
           )}
 
-          {/* ════ STEP 3 — OPENINGS ════ */}
+          {/* ════ STEP 3 — OPENINGS (building) ════ */}
           {step === 3 && (
             <div className="step-content">
-              <div className="step-title">Step 3: Doors & Windows</div>
-              <p className="step-desc">
-                Configure openings for <strong>{currentFloor?.label || "current floor"}</strong>.
-              </p>
+              <div className="step-title">Step 3: Building Doors & Windows</div>
+              <p className="step-desc">Configure openings on the outer walls of <strong>{currentFloor?.label || "current floor"}</strong>.</p>
 
               {currentOpenings.map((o, i) => (
                 <div className="partition-row" key={o.id}>
                   <div className="partition-row-header">
-                    <span className="partition-number">
-                      {o.type === "door" ? "🚪" : "🪟"} Opening {i + 1}
-                    </span>
-                    <button className="remove-btn" onClick={() => removeOpening(o.id)}>
-                      ✕
-                    </button>
+                    <span className="partition-number">{o.type === "door" ? "🚪" : "🪟"} Opening {i + 1}</span>
+                    <button className="remove-btn" onClick={() => removeOpening(o.id)}>✕</button>
                   </div>
                   <div className="dim-row two-col">
-                    <label>
-                      Label
-                      <input
-                        type="text"
-                        value={o.label}
-                        onChange={e => updateOpening(o.id, "label", e.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Type
-                      <select
-                        value={o.type}
-                        onChange={e => updateOpening(o.id, "type", e.target.value)}
-                      >
-                        <option value="door">Door</option>
-                        <option value="window">Window</option>
-                      </select>
-                    </label>
-                    <label>
-                      Wall / Location
-                      <select
-                        value={o.wall}
-                        onChange={e => updateOpening(o.id, "wall", e.target.value)}
-                      >
-                        <option value="front">Front Wall</option>
-                        <option value="back">Back Wall</option>
-                        <option value="left">Left Wall</option>
-                        <option value="right">Right Wall</option>
-                        {currentPartitions.map((p, pi) => (
-                          <option key={pi} value={`partition_${pi}`}>
-                            {p.label || `Partition ${pi + 1}`}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Width ({displayUnit})
-                      <input
-                        type="number"
-                        min={1}
-                        max={unit === "ft" ? 16 : 5}
-                        step={0.1}
-                        value={o.width}
-                        onChange={e => updateOpening(o.id, "width", e.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Height ({displayUnit})
-                      <input
-                        type="number"
-                        min={1}
-                        max={unit === "ft" ? 16 : 5}
-                        step={0.1}
-                        value={o.height}
-                        onChange={e => updateOpening(o.id, "height", e.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <div className="partition-area">
-                    Opening Area:{" "}
-                    <strong>
-                      {(
-                        toM(parseFloat(o.width) || 0, unit) * toM(parseFloat(o.height) || 0, unit)
-                      ).toFixed(2)}{" "}
-                      m²
-                    </strong>
+                    <label>Label <input type="text" value={o.label} onChange={e => updateOpening(o.id, "label", e.target.value)} /></label>
+                    <label>Type <select value={o.type} onChange={e => updateOpening(o.id, "type", e.target.value)}>
+                      <option value="door">Door</option><option value="window">Window</option>
+                    </select></label>
+                    <label>Wall <select value={o.wall} onChange={e => updateOpening(o.id, "wall", e.target.value)}>
+                      <option value="front">Front Wall</option><option value="back">Back Wall</option>
+                      <option value="left">Left Wall</option><option value="right">Right Wall</option>
+                      {currentPartitions.map((p, pi) => (
+                        <option key={pi} value={`partition_${pi}`}>{p.label || `Partition ${pi+1}`}</option>
+                      ))}
+                    </select></label>
+                    <label>Width ({displayUnit}) <input type="number" min={1} max={unit === "ft" ? 16 : 5} step={0.1} value={o.width} onChange={e => updateOpening(o.id, "width", e.target.value)} /></label>
+                    <label>Height ({displayUnit}) <input type="number" min={1} max={unit === "ft" ? 16 : 5} step={0.1} value={o.height} onChange={e => updateOpening(o.id, "height", e.target.value)} /></label>
                   </div>
                 </div>
               ))}
-
-              <button className="btn btn-outline full-width add-btn" onClick={addOpening}>
-                + Add Door / Window
-              </button>
-
+              <button className="btn btn-outline full-width add-btn" onClick={addOpening}>+ Add Door / Window</button>
               {currentOpenings.length > 0 && (
-                <div className="dim-summary" style={{ marginTop: "12px" }}>
-                  Total Deducted Area (this floor):{" "}
-                  <strong>
-                    {currentOpenings
-                      .reduce(
-                        (s, o) =>
-                          s +
-                          toM(parseFloat(o.width) || 0, unit) *
-                            toM(parseFloat(o.height) || 0, unit),
-                        0
-                      )
-                      .toFixed(2)}{" "}
-                    m²
-                  </strong>
+                <div className="dim-summary" style={{marginTop:"12px"}}>
+                  Total Deducted: <strong>{currentOpenings.reduce((s,o)=>s + (toM(parseFloat(o.width)||0, unit) * toM(parseFloat(o.height)||0, unit)),0).toFixed(2)} m²</strong>
                 </div>
               )}
             </div>
           )}
 
-          {/* ════ STEP 4 — PANELS (per floor) ════ */}
+          {/* ════ STEP 4 — PANELS ════ */}
           {step === 4 && (
             <div className="step-content">
               <div className="step-title">Step 4: Panel Specifications</div>
-              <p className="step-desc">
-                Configure panel specs for <strong>{currentFloor?.label || "current floor"}</strong>.
-              </p>
+              <p className="step-desc">Configure panel specs for <strong>{currentFloor?.label || "current floor"}</strong>.</p>
 
-              <label>
-                Standard Panel Width
-                <select
-                  value={currentFloor?.panelWidthMM || 1200}
-                  onChange={e => updateFloor(currentFloorId, "panelWidthMM", Number(e.target.value))}
-                >
-                  {PANEL_WIDTH_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value * 1000}>
-                      {o.label}
-                    </option>
-                  ))}
+              <label>Standard Panel Width
+                <select value={currentFloor?.panelWidthMM || 1200} onChange={e => updateFloor(currentFloorId, "panelWidthMM", Number(e.target.value))}>
+                  {PANEL_WIDTH_OPTIONS.map(o => <option key={o.value} value={o.value * 1000}>{o.label}</option>)}
                 </select>
               </label>
 
@@ -1064,27 +1117,16 @@ export default function App() {
                 <span className="field-label">Panel Color / Finish</span>
                 <div className="color-swatches">
                   {COLOR_OPTIONS.map(c => (
-                    <button
-                      key={c.hex}
-                      title={c.name}
+                    <button key={c.hex} title={c.name}
                       className={`swatch${(currentFloor?.panelColor || "#f5f5f5") === c.hex ? " active" : ""}`}
-                      style={{ background: c.hex }}
-                      onClick={() => updateFloor(currentFloorId, "panelColor", c.hex)}
-                    />
+                      style={{ background: c.hex }} onClick={() => updateFloor(currentFloorId, "panelColor", c.hex)} />
                   ))}
                 </div>
-                <span className="selected-color-name">
-                  Selected:{" "}
-                  {COLOR_OPTIONS.find(c => c.hex === (currentFloor?.panelColor || "#f5f5f5"))?.name}
-                </span>
+                <span className="selected-color-name">Selected: {COLOR_OPTIONS.find(c => c.hex === (currentFloor?.panelColor || "#f5f5f5"))?.name}</span>
               </div>
 
-              <label>
-                Wall Panel Thickness
-                <select
-                  value={currentFloor?.wallThickness || 100}
-                  onChange={e => updateFloor(currentFloorId, "wallThickness", Number(e.target.value))}
-                >
+              <label>Wall Panel Thickness
+                <select value={currentFloor?.wallThickness || 100} onChange={e => updateFloor(currentFloorId, "wallThickness", Number(e.target.value))}>
                   <option value={60}>60 mm — Light insulation</option>
                   <option value={80}>80 mm — Standard</option>
                   <option value={100}>100 mm — Cold Room (default)</option>
@@ -1093,25 +1135,16 @@ export default function App() {
                 </select>
               </label>
 
-              <div className="panel-type-section" style={{ marginTop: "6px" }}>
+              <div className="panel-type-section" style={{marginTop:"6px"}}>
                 <div className="panel-type-heading">🏗️ Global Building Settings</div>
-                <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: "0 0 8px" }}>
-                  These settings apply to the entire building.
-                </p>
-                <label className="toggle-label" style={{ marginBottom: "8px" }}>
-                  <input
-                    type="checkbox"
-                    checked={showRoof}
-                    onChange={e => setShowRoof(e.target.checked)}
-                  />
+                <p style={{fontSize:"11px",color:"var(--text-muted)",margin:"0 0 8px"}}>These settings apply to the entire building.</p>
+                <label className="toggle-label" style={{marginBottom:"8px"}}>
+                  <input type="checkbox" checked={showRoof} onChange={e => setShowRoof(e.target.checked)} />
                   Include Roof in calculation & 3D view
                 </label>
               </div>
 
-              <div className="info-box">
-                <strong>λ = 0.021 W/mK</strong> · Density 40±2 kg/m³ · CFC-free · Fire rated IS
-                12436
-              </div>
+              <div className="info-box"><strong>λ = 0.021 W/mK</strong> · Density 40±2 kg/m³ · CFC-free · Fire rated IS 12436</div>
             </div>
           )}
 
@@ -1119,75 +1152,44 @@ export default function App() {
           {step === 5 && (
             <div className="step-content">
               <div className="step-title">Step 5: Choose Panel Type</div>
-              <p className="step-desc">
-                Select which panels you need — walls, roof, or both. This applies to the entire
-                building.
-              </p>
+              <p className="step-desc">Select which panels you need — walls, roof, or both. This applies to the entire building.</p>
 
               <div className="field">
                 <span className="field-label">Panel Type</span>
                 {PANEL_TYPE_OPTIONS.map(s => (
                   <label key={s.value} className="radio-label">
-                    <input
-                      type="radio"
-                      name="pt"
-                      value={s.value}
-                      checked={panelType === s.value}
-                      onChange={() => setPanelType(s.value)}
-                    />
+                    <input type="radio" name="pt" value={s.value} checked={panelType === s.value} onChange={() => setPanelType(s.value)} />
                     {s.label}
                   </label>
                 ))}
               </div>
 
               {!showRoof && (panelType === "roof" || panelType === "both") && (
-                <div
-                  className="info-box"
-                  style={{ borderColor: "rgba(245,166,35,0.4)", color: "var(--accent)" }}
-                >
-                  ⚠️ Roof is currently disabled. Enable "Include Roof" in Step 4.
+                <div className="info-box" style={{borderColor:"rgba(245,166,35,0.4)",color:"var(--accent)"}}>
+                  ⚠️ Roof is disabled. Enable "Include Roof" in Step 4.
                 </div>
               )}
 
-              {/* Per-floor thickness summary */}
               <div className="panel-type-section">
                 <div className="panel-type-heading">📊 Per-Floor Wall Thickness</div>
                 {floors.map((f, i) => (
                   <div key={f.id} className="floor-thickness-row">
-                    <span
-                      className="floor-color-dot"
-                      style={{ background: f.panelColor || "#f5f5f5" }}
-                    />
+                    <span className="floor-color-dot" style={{background: f.panelColor || "#f5f5f5"}} />
                     <span>{f.label || `Floor ${i + 1}`}:</span>
-                    <select
-                      value={f.wallThickness}
-                      onChange={e =>
-                        updateFloor(f.id, "wallThickness", Number(e.target.value))
-                      }
-                      style={{ width: "auto", minWidth: "120px", marginLeft: "auto" }}
-                    >
-                      <option value={60}>60 mm</option>
-                      <option value={80}>80 mm</option>
-                      <option value={100}>100 mm</option>
-                      <option value={120}>120 mm</option>
+                    <select value={f.wallThickness} onChange={e => updateFloor(f.id, "wallThickness", Number(e.target.value))}
+                      style={{width:"auto",minWidth:"120px",marginLeft:"auto"}}>
+                      <option value={60}>60 mm</option><option value={80}>80 mm</option>
+                      <option value={100}>100 mm</option><option value={120}>120 mm</option>
                       <option value={150}>150 mm</option>
                     </select>
                   </div>
                 ))}
               </div>
 
-              <div className="dim-summary" style={{ marginTop: "4px" }}>
-                <span>
-                  Panel Type: <strong>{PANEL_TYPE_OPTIONS.find(p => p.value === panelType)?.label || panelType}</strong>
-                </span>
-                <span>
-                  Floors: <strong>{floors.length}</strong>
-                </span>
-                {showRoof && (
-                  <span>
-                    Roof: <strong>Included</strong>
-                  </span>
-                )}
+              <div className="dim-summary" style={{marginTop:"4px"}}>
+                <span>Panel Type: <strong>{PANEL_TYPE_OPTIONS.find(p => p.value === panelType)?.label || panelType}</strong></span>
+                <span>Floors: <strong>{floors.length}</strong></span>
+                {showRoof && <span>Roof: <strong>Included</strong></span>}
               </div>
             </div>
           )}
@@ -1198,89 +1200,40 @@ export default function App() {
               <div className="step-title">📊 Panel Calculation Results</div>
 
               <div className="results-summary-grid">
-                <div className="result-stat accent">
-                  <span className="rs-val">{calc.totalPanels}</span>
-                  <span className="rs-label">Total Panels</span>
-                </div>
-                <div className="result-stat">
-                  <span className="rs-val">{calc.totalArea.toFixed(1)}</span>
-                  <span className="rs-label">Total Area (m²)</span>
-                </div>
-                <div className="result-stat">
-                  <span className="rs-val">{calc.totalWeight.toFixed(0)}</span>
-                  <span className="rs-label">Est. Weight (kg)</span>
-                </div>
-                <div className="result-stat">
-                  <span className="rs-val">{floors.length}</span>
-                  <span className="rs-label">Floors</span>
-                </div>
+                <div className="result-stat accent"><span className="rs-val">{calc.totalPanels}</span><span className="rs-label">Total Panels</span></div>
+                <div className="result-stat"><span className="rs-val">{calc.totalArea.toFixed(1)}</span><span className="rs-label">Total Area (m²)</span></div>
+                <div className="result-stat"><span className="rs-val">{calc.totalWeight.toFixed(0)}</span><span className="rs-label">Est. Weight (kg)</span></div>
+                <div className="result-stat"><span className="rs-val">{floors.length}</span><span className="rs-label">Floors</span></div>
               </div>
 
-              <div className="dim-summary" style={{ justifyContent: "center" }}>
-                <span>
-                  Panel Type: <strong>{PANEL_TYPE_OPTIONS.find(p => p.value === panelType)?.label || panelType}</strong>
-                </span>
-                <span>
-                  Dimensions: <strong>
-                    {fmt(lengthM, "m")}m × {fmt(widthM, "m")}m × {fmt(totalHeightM, "m")}m
-                    {unit === "ft"
-                      ? ` / ${fmt(length, "ft", 1)}ft × ${fmt(width, "ft", 1)}ft × ${fmt(totalHeightM, "ft", 1)}ft`
-                      : ""}
-                  </strong>
-                </span>
-                <span>
-                  Floor Area: <strong>{(lengthM * widthM).toFixed(1)} m² per floor × {floors.length} floors</strong>
-                </span>
+              <div className="dim-summary" style={{justifyContent:"center"}}>
+                <span>Panel Type: <strong>{PANEL_TYPE_OPTIONS.find(p => p.value === panelType)?.label || panelType}</strong></span>
+                <span>Dimensions: <strong>{fmt(lengthM, "m")}m × {fmt(widthM, "m")}m × {fmt(totalHeightM, "m")}m</strong></span>
+                <span>Floor Area: <strong>{(lengthM * widthM).toFixed(1)} m² × {floors.length} floors</strong></span>
               </div>
 
-              {/* Per-floor breakdown */}
               <div className="results-table-wrap">
                 {calc.floorResults.map((fr, fi) => (
                   <div key={fi} className="floor-result-section">
                     <div className="floor-result-header">
-                      <span
-                        className="floor-color-dot"
-                        style={{ background: fr.panelColor }}
-                      />
+                      <span className="floor-color-dot" style={{background: fr.panelColor}} />
                       <strong>{fr.label}</strong>
-                      <span style={{ marginLeft: "auto", fontSize: "11px", color: "var(--text-muted)" }}>
-                        {fr.floorPanels} panels · {fr.floorArea.toFixed(1)} m²
-                      </span>
+                      <span style={{marginLeft:"auto",fontSize:"11px",color:"var(--text-muted)"}}>{fr.floorPanels} panels · {fr.floorArea.toFixed(1)} m²</span>
                     </div>
                     <table className="calc-table">
-                      <thead>
-                        <tr>
-                          <th>Wall</th>
-                          <th>Gross {areaUnitLabel}</th>
-                          <th>Net {areaUnitLabel}</th>
-                          <th>Panels</th>
-                        </tr>
-                      </thead>
+                      <thead><tr><th>Component</th><th>Gross {areaUnitLabel}</th><th>Net {areaUnitLabel}</th><th>Panels</th></tr></thead>
                       <tbody>
                         {fr.wallRows.map(w => (
-                          <tr key={w.id}>
-                            <td>{w.label.replace(`${fr.label} - `, "")}</td>
-                            <td>{w.grossArea.toFixed(1)}</td>
-                            <td>{w.netArea.toFixed(1)}</td>
-                            <td><strong>{w.panelCount}</strong></td>
-                          </tr>
+                          <tr key={w.id}><td>{w.label.replace(`${fr.label} - `, "")}</td><td>{w.grossArea.toFixed(1)}</td><td>{w.netArea.toFixed(1)}</td><td><strong>{w.panelCount}</strong></td></tr>
                         ))}
-                        {fr.partitionRows.length > 0 &&
-                          fr.partitionRows.map((p, pi) => (
-                            <tr key={pi}>
-                              <td style={{ color: "var(--primary-light)" }}>{p.label}</td>
-                              <td>{p.grossArea.toFixed(1)}</td>
-                              <td>{p.netArea.toFixed(1)}</td>
-                              <td><strong>{p.panelCount}</strong></td>
-                            </tr>
-                          ))}
+                        {fr.partitionRows.map((p, pi) => (
+                          <tr key={`p-${pi}`}><td style={{color:"var(--primary-light)"}}>{p.label}</td><td>{p.grossArea.toFixed(1)}</td><td>{p.netArea.toFixed(1)}</td><td><strong>{p.panelCount}</strong></td></tr>
+                        ))}
+                        {(fr.roomRows || []).map((rm, ri) => (
+                          <tr key={`rm-${ri}`}><td style={{color:"var(--accent)"}}>🏠 {rm.label}</td><td>{rm.totalArea.toFixed(1)}</td><td>{rm.totalArea.toFixed(1)}</td><td><strong>{rm.totalPanels}</strong></td></tr>
+                        ))}
                         {fr.roofArea > 0 && (
-                          <tr>
-                            <td style={{ color: "var(--accent)" }}>🟠 Roof</td>
-                            <td>{fr.roofArea.toFixed(1)}</td>
-                            <td>{fr.roofArea.toFixed(1)}</td>
-                            <td><strong>{fr.roofPanelCount}</strong></td>
-                          </tr>
+                          <tr><td style={{color:"var(--accent)"}}>🟠 Roof</td><td>{fr.roofArea.toFixed(1)}</td><td>{fr.roofArea.toFixed(1)}</td><td><strong>{fr.roofPanelCount}</strong></td></tr>
                         )}
                       </tbody>
                     </table>
@@ -1288,98 +1241,39 @@ export default function App() {
                 ))}
               </div>
 
-              <button
-                className="btn btn-primary full-width quote-btn"
-                onClick={() => setQuoteOpen(true)}
-              >
-                📄 Generate Full Quote Summary
-              </button>
+              <button className="btn btn-primary full-width quote-btn" onClick={() => setQuoteOpen(true)}>📄 Generate Full Quote Summary</button>
             </div>
           )}
 
-          {/* ─── Step Navigation ─── */}
           <div className="step-nav">
-            {step > 1 && (
-              <button className="btn btn-outline" onClick={prev}>
-                ← Back
-              </button>
-            )}
-            {step < 6 && (
-              <button className="btn btn-primary" onClick={next}>
-                {step === 5 ? "Calculate →" : "Next →"}
-              </button>
-            )}
-            {step === 6 && (
-              <button className="btn btn-outline" onClick={() => setStep(1)}>
-                ↺ Start Over
-              </button>
-            )}
+            {step > 1 && <button className="btn btn-outline" onClick={prev}>← Back</button>}
+            {step < 6 && <button className="btn btn-primary" onClick={next}>{step === 5 ? "Calculate →" : "Next →"}</button>}
+            {step === 6 && <button className="btn btn-outline" onClick={() => setStep(1)}>↺ Start Over</button>}
           </div>
         </div>
       </aside>
 
-      {/* ─── 3D CANVAS ─────────────────────────────────────────── */}
       <main className="canvas-area">
         <div className="canvas-stats" aria-live="polite">
-          <span className="stat-chip floors">
-            <strong>{floors.length}</strong> Floor{floors.length !== 1 ? "s" : ""}
-          </span>
-          <span className="stat-chip partitions">
-            <strong>{partitionCount}</strong> Partition{partitionCount !== 1 ? "s" : ""}
-          </span>
-          <span className="stat-chip doors">
-            <strong>{doorCount}</strong> Door{doorCount !== 1 ? "s" : ""}
-          </span>
-          <span className="stat-chip windows">
-            <strong>{windowCount}</strong> Window{windowCount !== 1 ? "s" : ""}
-          </span>
-          <span className="stat-chip" style={{ color: "#f5a623" }}>
-            <strong style={{ color: "#f5a623" }}>
-              {PANEL_TYPE_OPTIONS.find(p => p.value === panelType)?.label.split(" ")[0]}
-            </strong>
-          </span>
+          <span className="stat-chip floors"><strong>{floors.length}</strong> Floor{floors.length !== 1 ? "s" : ""}</span>
+          <span className="stat-chip rooms"><strong>{roomCount}</strong> Room{roomCount !== 1 ? "s" : ""}</span>
+          <span className="stat-chip partitions"><strong>{partitionCount}</strong> Partition{partitionCount !== 1 ? "s" : ""}</span>
+          <span className="stat-chip doors"><strong>{doorCount}</strong> Door{doorCount !== 1 ? "s" : ""}</span>
+          <span className="stat-chip windows"><strong>{windowCount}</strong> Window{windowCount !== 1 ? "s" : ""}</span>
         </div>
 
-        <Canvas
-          shadows
-          camera={{
-            position: [lengthM * 1.6, totalHeightM * 1.2 + 4, widthM * 2 + 4],
-            fov: 45,
-          }}
-          gl={{ antialias: true }}
-        >
-          <Scene
-            length={lengthM}
-            width={widthM}
-            floors={floors}
-            showRoof={showRoof}
-            unit={unit}
-            panelType={panelType}
-          />
+        <Canvas shadows camera={{ position: [lengthM * 1.6, totalHeightM * 1.2 + 4, widthM * 2 + 4], fov: 45 }} gl={{ antialias: true }}>
+          <Scene length={lengthM} width={widthM} floors={floors} showRoof={showRoof} unit={unit} panelType={panelType} />
         </Canvas>
 
         <div className="canvas-hint">🖱️ Drag to orbit · Scroll to zoom · Right-click to pan</div>
       </main>
 
-      {/* ─── QUOTE MODAL ───────────────────────────────────────── */}
       <QuoteModal
         open={quoteOpen}
         onClose={() => setQuoteOpen(false)}
-        config={{
-          length: lengthM,
-          width: widthM,
-          totalHeight: totalHeightM,
-          displayLength: length,
-          displayWidth: width,
-          displayTotalHeight: fmt(totalHeightM, unit, 1),
-          structureType,
-          showRoof,
-          unit,
-          panelType,
-          floors: floors.length,
-          panelWidthMM: 1200,
-          panelThickness: 100,
-        }}
+        config={{ length: lengthM, width: widthM, totalHeight: totalHeightM, displayLength: length, displayWidth: width,
+          displayTotalHeight: fmt(totalHeightM, unit, 1), structureType, showRoof, unit, panelType, floors: floors.length, panelWidthMM: 1200, panelThickness: 100 }}
         calc={calc}
         floors={floors}
         unit={unit}

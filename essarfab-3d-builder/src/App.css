@@ -1040,6 +1040,170 @@ select option { background: #1a3524; color: #fff; }
 /* ── Stat chip for floors ─────────────────────────────────── */
 .stat-chip.floors strong { color: var(--accent); }
 
+/* ── Stat chip for rooms ──────────────────────────────────── */
+.stat-chip.rooms strong { color: #ffd54f; }
+
+/* ── Section Subheading ───────────────────────────────────── */
+.section-subheading {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(31,110,67,0.3);
+  margin-top: 4px;
+}
+
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  margin: 4px 0;
+}
+
+/* ── Room Card ────────────────────────────────────────────── */
+.room-card {
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.room-card:hover {
+  border-color: rgba(31,110,67,0.4);
+}
+.room-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(245,166,35,0.2);
+}
+
+/* ── Room Editor (expanded) ───────────────────────────────── */
+.room-editor {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Room Opening Section ─────────────────────────────────── */
+.room-openings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.empty-hint-sm {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 10px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+}
+
+.room-opening-row {
+  background: rgba(0,0,0,0.15);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.room-opening-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.remove-btn-xs {
+  background: none;
+  border: 1px solid rgba(255,85,85,0.3);
+  color: var(--danger);
+  border-radius: 3px;
+  width: 18px;
+  height: 18px;
+  font-size: 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.remove-btn-xs:hover { background: rgba(255,85,85,0.15); }
+
+.room-opening-fields {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.room-opening-fields select,
+.room-opening-fields input {
+  width: 100%;
+  padding: 4px 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+}
+
+.room-opening-fields select:focus,
+.room-opening-fields input:focus {
+  border-color: var(--primary);
+}
+
+.room-label-input {
+  min-width: 60px;
+}
+
+.add-btn-sm {
+  padding: 6px 10px !important;
+  font-size: 11px !important;
+  border-style: dashed !important;
+}
+
+/* ── Side Walls Grid ──────────────────────────────────────── */
+.side-walls-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.side-wall-btn {
+  padding: 5px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.side-wall-btn:hover {
+  background: var(--surface);
+  color: var(--text);
+  border-color: rgba(255,255,255,0.15);
+}
+
+.side-wall-btn.active {
+  background: rgba(31,110,67,0.25);
+  border-color: var(--primary);
+  color: var(--primary-light);
+}
+
 @media (max-width: 480px) {
   .sidebar { max-height: 45vh; }
   .canvas-area { height: 55vh; }
