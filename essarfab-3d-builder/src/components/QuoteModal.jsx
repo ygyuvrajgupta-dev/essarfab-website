@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_OPTIONS, STRUCTURE_TYPES }) {
+function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, COLOR_OPTIONS, STRUCTURE_TYPES }) {
   useEffect(() => {
     if (open) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "";
@@ -9,15 +9,15 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
 
   if (!open) return null;
 
-  const colorName  = COLOR_OPTIONS?.find(c => c.hex === config.panelColor)?.name || config.panelColor;
   const structName = STRUCTURE_TYPES?.find(s => s.value === config.structureType)?.label || config.structureType;
-  const unit = config.unit || "m";
-  const du = unit === "m" ? "m" : "ft";
-  const au = unit === "m" ? "m²" : "sq.ft";
+  const du = displayUnit || "m";
+  const au = unit === "m" ? "m²" : "sq. ft";
 
   const displayL = config.displayLength ?? config.length;
   const displayW = config.displayWidth ?? config.width;
-  const displayH = config.displayHeight ?? config.height;
+  const displayH = config.displayTotalHeight ?? (config.totalHeight ? (unit === "m" ? config.totalHeight.toFixed(1) : (config.totalHeight * 3.28084).toFixed(1)) : "—");
+
+  const floorCount = config.floors || floors?.length || 1;
 
   const handleCopy = () => {
     const lines = [
@@ -26,31 +26,28 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
       "   PUF Panel Estimation — Quote Summary",
       "════════════════════════════════════════",
       "",
-      `Project Type     : ${structName}`,
-      `Dimensions       : ${displayL}${du} (L) × ${displayW}${du} (W) × ${displayH}${du} (H)`,
-      `Panel Thickness  : ${config.panelThickness} mm`,
-      `Panel Width Std  : ${config.panelWidthMM} mm`,
-      `Panel Color      : ${colorName}`,
-      `Include Roof     : ${config.showRoof ? "Yes" : "No"}`,
+      `Project Type        : ${structName}`,
+      `Dimensions          : ${displayL}${du} (L) × ${displayW}${du} (W) × ${displayH}${du} (H)`,
+      `Floors              : ${floorCount}`,
+      `Floor Area (each)   : ${(config.length * config.width).toFixed(2)} m²`,
+      `Total Floor Area    : ${(config.length * config.width * floorCount).toFixed(2)} m²`,
+      `Include Roof        : ${config.showRoof ? "Yes" : "No"}`,
+      `Panel Type          : ${config.panelType || "both"}`,
       "",
-      "── Outer Walls ──────────────────────────",
-      ...calc.wallRows.map(w =>
-        `${w.label.padEnd(14)} | Gross: ${w.grossArea.toFixed(2).padStart(6)} ${au} | Deduct: ${w.openingDeduction.toFixed(2).padStart(5)} ${au} | Net: ${w.netArea.toFixed(2).padStart(6)} ${au} | Panels: ${w.panelCount}`
-      ),
-      "",
-      `Roof             | Area:  ${calc.roofArea.toFixed(2)} ${au} | Panels: ${calc.roofPanelCount}`,
-      "",
-      ...(calc.partitionRows.length > 0 ? [
-        "── Partitions ───────────────────────────",
-        ...calc.partitionRows.map(p =>
-          `${(p.label).padEnd(14)} | Gross: ${p.grossArea.toFixed(2).padStart(6)} ${au} | Net: ${p.netArea.toFixed(2).padStart(6)} ${au} | Panels: ${p.panelCount}`
-        ),
+      "── Per-Floor Breakdown ────────────────────",
+      ...(calc.floorResults || []).flatMap((fr, fi) => [
+        `  ${fr.label || `Floor ${fi + 1}`}:`,
+        `    Wall Panels:    ${fr.floorPanels} panels · ${fr.floorArea.toFixed(2)} ${au}`,
+        `    Est. Weight:    ${fr.floorWeight.toFixed(0)} kg`,
+        `    Wall Color:     ${COLOR_OPTIONS?.find(c => c.hex === fr.panelColor)?.name || fr.panelColor}`,
+        `    Wall Thickness: ${fr.wallThickness} mm`,
         "",
-      ] : []),
+      ]),
       "── Summary ──────────────────────────────",
-      `Total Panels     : ${calc.totalPanels}`,
-      `Total Panel Area : ${calc.totalArea.toFixed(2)} ${au}`,
-      `Estimated Weight : ${calc.weight.toFixed(0)} kg`,
+      `Total Panels       : ${calc.totalPanels}`,
+      `Total Panel Area   : ${calc.totalArea.toFixed(2)} ${au}`,
+      `Estimated Weight   : ${calc.totalWeight.toFixed(0)} kg`,
+      `Number of Floors   : ${floorCount}`,
       "",
       "════════════════════════════════════════",
       "Contact: +91-98387 00617",
@@ -71,7 +68,7 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
         <div className="modal-header">
           <div>
             <div className="modal-brand">ESSARFAB</div>
-            <div className="modal-subtitle">PUF Panel Estimation — Quote Summary</div>
+            <div className="modal-subtitle">PUF Panel Estimation — Multi-Floor Quote Summary</div>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
@@ -85,105 +82,85 @@ function QuoteModal({ open, onClose, config, calc, openings, partitions, COLOR_O
               <tbody>
                 <tr><td>Project Type</td><td>{structName}</td></tr>
                 <tr><td>Dimensions (L × W × H)</td><td>{displayL}{du} × {displayW}{du} × {displayH}{du}</td></tr>
-                <tr><td>Floor Area</td><td>{(config.length * config.width).toFixed(2)} m² {unit === "ft" ? `/ ${(displayL * displayW).toFixed(2)} sq.ft` : ""}</td></tr>
-                <tr><td>Panel Thickness</td><td>{config.panelThickness} mm</td></tr>
-                <tr><td>Standard Panel Width</td><td>{config.panelWidthMM} mm</td></tr>
-                <tr>
-                  <td>Panel Color</td>
-                  <td>
-                    <span className="color-dot" style={{ background: config.panelColor }} />
-                    {colorName}
-                  </td>
-                </tr>
+                <tr><td>Number of Floors</td><td><strong>{floorCount}</strong></td></tr>
+                <tr><td>Floor Area (per floor)</td><td>{(config.length * config.width).toFixed(2)} m²</td></tr>
+                <tr><td>Total Floor Area</td><td>{(config.length * config.width * floorCount).toFixed(2)} m²</td></tr>
                 <tr><td>Roof Panels</td><td>{config.showRoof ? "Included" : "Not included"}</td></tr>
+                <tr><td>Panel Type</td><td>{config.panelType || "both"}</td></tr>
               </tbody>
             </table>
           </section>
 
-          {/* Walls breakdown */}
-          <section>
-            <h4>Outer Wall Panels</h4>
-            <table className="quote-table">
-              <thead>
-                <tr><th>Wall</th><th>Gross {au}</th><th>Deduct {au}</th><th>Net {au}</th><th>Panels</th></tr>
-              </thead>
-              <tbody>
-                {calc.wallRows.map(w => (
-                  <tr key={w.id}>
-                    <td>{w.label}</td>
-                    <td>{w.grossArea.toFixed(2)}</td>
-                    <td>{w.openingDeduction > 0 ? <span className="deduct">-{w.openingDeduction.toFixed(2)}</span> : "—"}</td>
-                    <td>{w.netArea.toFixed(2)}</td>
-                    <td><strong>{w.panelCount}</strong></td>
-                  </tr>
-                ))}
-                {config.showRoof && (
-                  <tr>
-                    <td>Roof</td>
-                    <td>{calc.roofArea.toFixed(2)}</td>
-                    <td>—</td>
-                    <td>{calc.roofArea.toFixed(2)}</td>
-                    <td><strong>{calc.roofPanelCount}</strong></td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </section>
-
-          {/* Partitions */}
-          {calc.partitionRows.length > 0 && (
-            <section>
-              <h4>Internal Partition Panels</h4>
-              <table className="quote-table">
-                <thead>
-                  <tr><th>Partition</th><th>Gross {au}</th><th>Deduct {au}</th><th>Net {au}</th><th>Panels</th></tr>
-                </thead>
-                <tbody>
-                  {calc.partitionRows.map((p, i) => (
-                    <tr key={i}>
-                      <td>{p.label}</td>
-                      <td>{p.grossArea.toFixed(2)}</td>
-                      <td>{p.deduct > 0 ? <span className="deduct">-{p.deduct.toFixed(2)}</span> : "—"}</td>
-                      <td>{p.netArea.toFixed(2)}</td>
-                      <td><strong>{p.panelCount}</strong></td>
+          {/* Per-floor breakdown */}
+          {(calc.floorResults || []).map((fr, fi) => {
+            const colorName = COLOR_OPTIONS?.find(c => c.hex === fr.panelColor)?.name || fr.panelColor;
+            return (
+              <section key={fi}>
+                <h4>
+                  <span className="color-dot" style={{ background: fr.panelColor || "#f5f5f5" }} />
+                  {fr.label || `Floor ${fi + 1}`}
+                  <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--text-muted)", marginLeft: "8px" }}>
+                    {fr.floorPanels} panels · {fr.floorArea.toFixed(2)} {au}
+                  </span>
+                </h4>
+                <table className="quote-table">
+                  <thead>
+                    <tr><th>Wall</th><th>Gross {au}</th><th>Net {au}</th><th>Panels</th></tr>
+                  </thead>
+                  <tbody>
+                    {fr.wallRows.map(w => (
+                      <tr key={w.id}>
+                        <td>{w.label.replace(`${fr.label} - `, "")}</td>
+                        <td>{w.grossArea.toFixed(2)}</td>
+                        <td>{w.netArea.toFixed(2)}</td>
+                        <td><strong>{w.panelCount}</strong></td>
+                      </tr>
+                    ))}
+                    {fr.partitionRows.map((p, pi) => (
+                      <tr key={`p-${pi}`}>
+                        <td style={{ color: "var(--primary-light)" }}>{p.label}</td>
+                        <td>{p.grossArea.toFixed(2)}</td>
+                        <td>{p.netArea.toFixed(2)}</td>
+                        <td><strong>{p.panelCount}</strong></td>
+                      </tr>
+                    ))}
+                    {fr.roofArea > 0 && (
+                      <tr>
+                        <td style={{ color: "var(--accent)" }}>🟠 Roof</td>
+                        <td>{fr.roofArea.toFixed(2)}</td>
+                        <td>{fr.roofArea.toFixed(2)}</td>
+                        <td><strong>{fr.roofPanelCount}</strong></td>
+                      </tr>
+                    )}
+                    <tr className="total-row">
+                      <td><strong>Floor Totals</strong></td>
+                      <td><strong>{fr.floorArea.toFixed(2)}</strong></td>
+                      <td><strong>{fr.floorArea.toFixed(2)}</strong></td>
+                      <td><strong>{fr.floorPanels}</strong></td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          )}
+                  </tbody>
+                </table>
+                <table className="quote-table" style={{ marginTop: "4px" }}>
+                  <tbody>
+                    <tr><td style={{ width: "140px" }}>Wall Color</td><td><span className="color-dot" style={{ background: fr.panelColor }} /> {colorName}</td></tr>
+                    <tr><td>Wall Thickness</td><td>{fr.wallThickness} mm</td></tr>
+                    <tr><td>Panel Width</td><td>{fr.panelWidthMM || 1200} mm</td></tr>
+                    <tr><td>Est. Weight (this floor)</td><td>{fr.floorWeight.toFixed(0)} kg</td></tr>
+                  </tbody>
+                </table>
+              </section>
+            );
+          })}
 
-          {/* Openings */}
-          {openings && openings.length > 0 && (
-            <section>
-              <h4>Openings Deducted</h4>
-              <table className="quote-table">
-                <thead><tr><th>Label</th><th>Type</th><th>Location</th><th>W × H</th><th>Area</th></tr></thead>
-                <tbody>
-                  {openings.map(o => (
-                    <tr key={o.id}>
-                      <td>{o.label}</td>
-                      <td style={{textTransform:"capitalize"}}>{o.type}</td>
-                      <td style={{textTransform:"capitalize"}}>{o.wall}</td>
-                      <td>{o.width}{du} × {o.height}{du}</td>
-                      <td><span className="deduct">-{((parseFloat(o.width)||0)*(parseFloat(o.height)||0)).toFixed(2)} {au}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          )}
-
-          {/* Totals */}
+          {/* Final Summary */}
           <section>
             <h4>Final Summary</h4>
             <table className="quote-table">
               <tbody>
-                <tr><td>Total PUF Panels Required</td><td><strong style={{color:"var(--accent)",fontSize:"16px"}}>{calc.totalPanels} panels</strong></td></tr>
+                <tr><td>Total PUF Panels Required</td><td><strong style={{ color: "var(--accent)", fontSize: "16px" }}>{calc.totalPanels} panels</strong></td></tr>
                 <tr><td>Total Panel Area</td><td><strong>{calc.totalArea.toFixed(2)} {au}</strong></td></tr>
-                <tr><td>Estimated Panel Weight</td><td>{calc.weight.toFixed(0)} kg</td></tr>
-                <tr><td>Panel Thickness</td><td>{config.panelThickness} mm</td></tr>
-                <tr><td>Standard Panel Width</td><td>{config.panelWidthMM} mm</td></tr>
+                <tr><td>Total Estimated Weight</td><td><strong>{calc.totalWeight.toFixed(0)} kg</strong></td></tr>
+                <tr><td>Number of Floors</td><td>{floorCount}</td></tr>
               </tbody>
             </table>
           </section>

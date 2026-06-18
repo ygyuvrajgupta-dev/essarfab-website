@@ -143,8 +143,9 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', system-u
 .step-indicator {
   display: flex;
   align-items: center;
-  padding: 12px 20px;
-  background: var(--surface3);
+  justify-content: center;
+  padding: 14px 16px 10px;
+  background: linear-gradient(180deg, var(--surface3) 0%, rgba(15,35,24,0.6) 100%);
   border-bottom: 1px solid var(--border);
   gap: 0;
   flex-shrink: 0;
@@ -159,64 +160,77 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', system-u
   flex: 1;
   min-width: 0;
   position: relative;
+  cursor: default;
 }
 
 /* connector line */
 .step-dot:not(:last-child)::after {
   content: '';
   position: absolute;
-  top: 13px;
+  top: 14px;
   right: -50%;
   width: 100%;
-  height: 2px;
-  background: var(--border);
+  height: 3px;
+  background: linear-gradient(90deg, var(--border) 0%, rgba(255,255,255,0.04) 100%);
   z-index: 0;
+  border-radius: 2px;
 }
-.step-dot.done:not(:last-child)::after { background: var(--primary); }
+.step-dot.done:not(:last-child)::after {
+  background: linear-gradient(90deg, #1f6e43 0%, #268a55 100%);
+}
 
 .dot {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--surface2);
-  border: 2px solid var(--border);
+  border: 2px solid rgba(255,255,255,0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.35);
   z-index: 1;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   position: relative;
 }
 
 .step-dot.active .dot {
-  background: var(--primary);
+  background: linear-gradient(135deg, #1f6e43 0%, #268a55 100%);
   border-color: var(--accent);
   color: #fff;
-  box-shadow: 0 0 12px rgba(245,166,35,0.4);
+  box-shadow: 0 0 16px rgba(245,166,35,0.35), 0 4px 12px rgba(31,110,67,0.3);
+  transform: scale(1.08);
 }
 
 .step-dot.done .dot {
-  background: var(--primary-dark);
-  border-color: var(--primary);
+  background: linear-gradient(135deg, #0a3b2f 0%, #1f6e43 100%);
+  border-color: rgba(31,110,67,0.6);
   color: var(--accent);
+  font-size: 13px;
 }
 
 .step-label {
-  font-size: 9px;
-  color: var(--text-muted);
+  font-size: 8px;
+  color: rgba(255,255,255,0.3);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
   white-space: nowrap;
+  font-weight: 700;
+  transition: color 0.3s ease;
 }
-.step-dot.active .step-label { color: var(--accent); }
-.step-dot.done  .step-label { color: var(--primary-light); }
+.step-dot.active .step-label {
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(245,166,35,0.2);
+}
+.step-dot.done  .step-label {
+  color: rgba(31,110,67,0.8);
+}
 
 /* ── Step Content ────────────────────────────────────────── */
 .step-content {
-  padding: 18px 20px 12px;
+  padding: 16px 20px 12px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -224,17 +238,35 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', system-u
 }
 
 .step-title {
-  font-size: 14px;
-  font-weight: 700;
+  position: relative;
+  font-size: 15px;
+  font-weight: 800;
   color: var(--text);
-  letter-spacing: 0.2px;
+  letter-spacing: 0.1px;
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+  border-bottom: 2px solid rgba(31,110,67,0.25);
+}
+
+.step-title::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 48px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px;
 }
 
 .step-desc {
   font-size: 12px;
   color: var(--text-muted);
   line-height: 1.55;
-  margin-top: -6px;
+  margin-top: -8px;
+  padding-left: 2px;
+  border-left: 2px solid rgba(31,110,67,0.3);
+  padding-left: 10px;
 }
 
 /* ── Form fields ──────────────────────────────────────────── */
@@ -821,6 +853,192 @@ select option { background: #1a3524; color: #fff; }
   .stat-chip strong { font-size: 13px; }
   .btn { padding: 8px 14px; font-size: 12px; }
 }
+
+/* ── Floor Management ─────────────────────────────────────── */
+.floor-management {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.floor-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.floor-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.floor-item-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.floor-color-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
+  flex-shrink: 0;
+}
+
+.floor-color-select {
+  gap: 6px;
+}
+
+.floor-color-options {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.mini-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.15);
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.1s, border-color 0.1s;
+}
+.mini-swatch:hover { transform: scale(1.2); }
+.mini-swatch.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(245,166,35,0.35);
+}
+
+.floor-dim-row {
+  grid-template-columns: 1fr 1fr;
+}
+
+.remove-btn-sm {
+  background: none;
+  border: 1px solid rgba(255,85,85,0.3);
+  color: var(--danger);
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.remove-btn-sm:hover { background: rgba(255,85,85,0.15); }
+
+/* ── Floor Selector Tabs ──────────────────────────────────── */
+.floor-selector {
+  padding: 8px 12px;
+  background: var(--surface3);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.floor-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.floor-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.floor-tab:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.floor-tab.active {
+  background: rgba(31,110,67,0.2);
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.floor-tab-color {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
+  flex-shrink: 0;
+}
+
+.floor-remove-tab {
+  margin-left: 2px;
+  color: var(--danger);
+  font-size: 10px;
+  padding: 0 2px;
+  line-height: 1;
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+.floor-remove-tab:hover { background: rgba(255,85,85,0.15); }
+
+.add-floor-tab {
+  border-style: dashed !important;
+  color: var(--primary-light);
+}
+.add-floor-tab:hover {
+  background: rgba(31,110,67,0.15);
+}
+
+/* ── Floor Thickness Row (Step 5) ─────────────────────────── */
+.floor-thickness-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+/* ── Floor Result Section (Step 6) ────────────────────────── */
+.floor-result-section {
+  margin-bottom: 12px;
+}
+
+.floor-result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-size: 13px;
+}
+
+/* ── Stat chip for floors ─────────────────────────────────── */
+.stat-chip.floors strong { color: var(--accent); }
 
 @media (max-width: 480px) {
   .sidebar { max-height: 45vh; }
