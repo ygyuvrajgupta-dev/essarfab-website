@@ -1221,3 +1221,52 @@ select option { background: #1a3524; color: #fff; }
   .quote-table th { font-size: 10px; }
   .quote-table td { padding: 5px 6px; }
 }
+
+/* ── Rotation Slider ────────────────────────────────────── */
+.rotation-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.rotation-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  outline: none;
+  border: 1px solid var(--border);
+}
+
+.rotation-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 6px rgba(31,110,67,0.4);
+}
+
+.rotation-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 6px rgba(31,110,67,0.4);
+}
+
+.rotation-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 36px;
+  text-align: right;
+}

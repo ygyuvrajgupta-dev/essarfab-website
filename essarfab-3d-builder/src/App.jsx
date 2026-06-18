@@ -493,17 +493,53 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
           </>
         )}
 
-        {/* Partitions */}
+        {/* Partitions — with position, rotation, and per-partition openings */}
         {showWalls &&
-          partitionLayouts.map(({ partition, index, wallLen, wallH, z }) => (
-            <Fragment key={partition.id ?? index}>
-              <Panel position={[0, yOffset + wallH / 2, z]} size={[wallLen, wallH, wallT]} color="#dce8e0" panelWidth={pw} />
-              <Text position={[0, yOffset + wallH + 0.35, z]} fontSize={0.28} color="#3ec47e"
-                anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000">
-                {`${floor.label || `F${fi + 1}`} P${index + 1}: ${partition.label || `Partition ${index + 1}`}`}
-              </Text>
-            </Fragment>
-          ))}
+          partitionLayouts.map(({ partition, index, wallLen, wallH, x, z, rad }) => {
+            // Gather partition-specific openings
+            const partOpenings = partition.openings || [];
+            const placedPartOpenings = [];
+            const groupedPart = groupOpeningsByWall(partOpenings);
+            Object.entries(groupedPart).forEach(([wallId, wallOpenings]) => {
+              const span = wallLen;
+              layoutAlongWall(wallOpenings, span).forEach(({ item, offset }) => {
+                const doorW = parseFloat(item.width) || 0.9;
+                const doorH = parseFloat(item.height) || 2.0;
+                const yPos = doorH / 2;
+                const insetV = wallT / 2 + 0.015;
+                const worldX = x + offset * Math.cos(rad) + insetV * Math.sin(rad);
+                const worldZ = z + offset * Math.sin(rad) + insetV * Math.cos(rad);
+                placedPartOpenings.push({
+                  opening: item,
+                  position: [worldX, yPos + yOffset, worldZ],
+                  rotation: [0, rad, 0],
+                  width: doorW,
+                  height: doorH,
+                });
+              });
+            });
+
+            return (
+              <Fragment key={partition.id ?? index}>
+                <Panel position={[x, yOffset + wallH / 2, z]} rotation={[0, rad, 0]} size={[wallLen, wallH, wallT]} color="#dce8e0" panelWidth={pw} />
+                {placedPartOpenings.map(({ opening, position, rotation, width: w, height: h }, oi) =>
+                  opening.type === "door" ? (
+                    <Door key={opening.id ?? `pd-${index}-${oi}`}
+                      position={position} rotation={rotation} doorWidth={w} doorHeight={h}
+                      color="#dce8e0" thickness={wallT} />
+                  ) : (
+                    <Window key={opening.id ?? `pw-${index}-${oi}`}
+                      position={position} rotation={rotation} windowWidth={w} windowHeight={h}
+                      sillHeight={0.6} thickness={wallT} />
+                  )
+                )}
+                <Text position={[x, yOffset + wallH + 0.35, z]} fontSize={0.28} color="#3ec47e"
+                  anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000">
+                  {`${floor.label || `F${fi + 1}`} P${index + 1}: ${partition.label || `Partition ${index + 1}`}`}
+                </Text>
+              </Fragment>
+            );
+          })}
 
         {/* Internal Rooms */}
         {showWalls && (floor.internalRooms || []).map((rm, ri) => (
@@ -732,7 +768,16 @@ export default function App() {
     const defaultH = unit === "ft" ? "13.1" : "4";
     updateFloor(currentFloorId, "partitions", [
       ...currentPartitions,
-      { id: Date.now(), label: `Partition ${currentPartitions.length + 1}`, length: defaultLen, height: defaultH },
+      {
+        id: Date.now(),
+        label: `Partition ${currentPartitions.length + 1}`,
+        length: defaultLen,
+        height: defaultH,
+        positionX: "",
+        positionZ: "",
+        rotationDeg: "0",
+        openings: [],
+      },
     ]);
   };
 
@@ -740,6 +785,31 @@ export default function App() {
 
   const updatePartition = (id, field, val) => {
     updateFloor(currentFloorId, "partitions", currentPartitions.map(x => (x.id === id ? { ...x, [field]: val } : x)));
+  };
+
+  // ── Partition Opening CRUD ──
+  const addPartitionOpening = (partId) => {
+    const dw = unit === "ft" ? "3.0" : "0.9";
+    const dh = unit === "ft" ? "6.5" : "2.0";
+    updateFloor(currentFloorId, "partitions", currentPartitions.map(p =>
+      p.id === partId
+        ? { ...p, openings: [...(p.openings || []), { id: Date.now(), type: "door", wall: "partition_side", width: dw, height: dh, label: `Door ${(p.openings || []).length + 1}` }] }
+        : p
+    ));
+  };
+
+  const removePartitionOpening = (partId, opId) => {
+    updateFloor(currentFloorId, "partitions", currentPartitions.map(p =>
+      p.id === partId ? { ...p, openings: (p.openings || []).filter(o => o.id !== opId) } : p
+    ));
+  };
+
+  const updatePartitionOpening = (partId, opId, field, val) => {
+    updateFloor(currentFloorId, "partitions", currentPartitions.map(p =>
+      p.id === partId
+        ? { ...p, openings: (p.openings || []).map(o => (o.id === opId ? { ...o, [field]: val } : o)) }
+        : p
+    ));
   };
 
   // ── Opening CRUD (building) ──
@@ -957,9 +1027,40 @@ export default function App() {
                   </div>
                   <div className="dim-row">
                     <label>Label <input type="text" value={p.label} onChange={e => updatePartition(p.id, "label", e.target.value)} placeholder="e.g. Room Divider" /></label>
-                    <label>Length ({displayUnit}) <input type="number" min={1} step={0.5} value={p.length} onChange={e => updatePartition(p.id, "length", e.target.value)} /></label>
-                    <label>Height ({displayUnit}) <input type="number" min={1} max={unit === "ft" ? 50 : 15} step={0.5} value={p.height} onChange={e => updatePartition(p.id, "height", e.target.value)} /></label>
+                    <label>Length ({displayUnit}) <input type="number" min={0.5} step={0.5} value={p.length} onChange={e => updatePartition(p.id, "length", e.target.value)} /></label>
+                    <label>Height ({displayUnit}) <input type="number" min={0.5} max={unit === "ft" ? 50 : 15} step={0.5} value={p.height} onChange={e => updatePartition(p.id, "height", e.target.value)} /></label>
                   </div>
+                  <div className="dim-row two-col">
+                    <label>Pos X ({displayUnit}) <input type="number" step={0.1} value={p.positionX || ""} placeholder="Auto" onChange={e => updatePartition(p.id, "positionX", e.target.value)} /></label>
+                    <label>Pos Z ({displayUnit}) <input type="number" step={0.1} value={p.positionZ || ""} placeholder="Auto" onChange={e => updatePartition(p.id, "positionZ", e.target.value)} /></label>
+                    <label>Rotation (°)
+                      <div className="rotation-slider-wrap">
+                        <input type="range" min={0} max={360} step={5} value={p.rotationDeg || "0"} onChange={e => updatePartition(p.id, "rotationDeg", String(e.target.value))} className="rotation-slider" />
+                        <span className="rotation-val">{(p.rotationDeg || "0") + "°"}</span>
+                      </div>
+                    </label>
+                  </div>
+                  {/* ── Per-partition openings ── */}
+                  <div className="small-section-heading">🚪 Openings in this Partition</div>
+                  {(p.openings || []).length === 0 && <div className="empty-hint-sm" style={{margin:"0"}}>No openings. Add a door/window.</div>}
+                  {(p.openings || []).map((op, oi) => (
+                    <div key={op.id} className="room-opening-row" style={{marginBottom:"4px"}}>
+                      <div className="room-opening-header">
+                        <span>{op.type === "door" ? "🚪" : "🪟"} {op.label || `Opening ${oi + 1}`}</span>
+                        <button className="remove-btn-xs" onClick={() => removePartitionOpening(p.id, op.id)}>✕</button>
+                      </div>
+                      <div className="room-opening-fields">
+                        <select value={op.type} onChange={e => updatePartitionOpening(p.id, op.id, "type", e.target.value)}>
+                          <option value="door">Door</option>
+                          <option value="window">Window</option>
+                        </select>
+                        <input type="number" min={0.3} max={unit === "ft" ? 8 : 2.5} step={0.1} value={op.width} onChange={e => updatePartitionOpening(p.id, op.id, "width", e.target.value)} placeholder={`W (${displayUnit})`} />
+                        <input type="number" min={0.3} max={unit === "ft" ? 8 : 2.5} step={0.1} value={op.height} onChange={e => updatePartitionOpening(p.id, op.id, "height", e.target.value)} placeholder={`H (${displayUnit})`} />
+                        <input type="text" value={op.label} onChange={e => updatePartitionOpening(p.id, op.id, "label", e.target.value)} placeholder="Label" />
+                      </div>
+                    </div>
+                  ))}
+                  <button className="btn btn-outline full-width add-btn-sm" onClick={() => addPartitionOpening(p.id)}>+ Add Door/Window</button>
                 </div>
               ))}
               <button className="btn btn-outline full-width add-btn" onClick={addPartition}>+ Add Partition Wall</button>

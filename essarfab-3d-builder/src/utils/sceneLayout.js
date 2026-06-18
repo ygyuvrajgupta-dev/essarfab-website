@@ -8,16 +8,53 @@ export function layoutAlongWall(items, span) {
   }));
 }
 
-/** Partition positions inside the room (walls run along X, placed across Z). */
+/**
+ * Partition positions inside the room.
+ * Each partition has: positionX, positionZ, rotationDeg (0-360 degrees).
+ * 0° = along X-axis, 90° = along Z-axis, any angle in between.
+ *
+ * Position is clamped so the ENTIRE partition wall stays inside the building footprint.
+ */
 export function getPartitionLayouts(partitions, length, width, height) {
-  const count = partitions.length;
-  if (!count) return [];
+  if (!partitions.length) return [];
 
   return partitions.map((p, i) => {
-    const wallLen = Math.min(parseFloat(p.length) || length, length);
+    const posX = p.positionX !== undefined && p.positionX !== "" ? parseFloat(p.positionX) : null;
+    const posZ = p.positionZ !== undefined && p.positionZ !== "" ? parseFloat(p.positionZ) : null;
+    const rotDeg = parseFloat(p.rotationDeg) || 0;
+    const rad = (rotDeg * Math.PI) / 180;
+
+    const wallLen = Math.min(parseFloat(p.length) || length, Math.max(length, width));
     const wallH = parseFloat(p.height) || height;
-    const z = -width / 2 + ((i + 1) * width) / (count + 1);
-    return { partition: p, index: i, wallLen, wallH, z };
+
+    // Half-length of the wall
+    const halfLen = wallLen / 2;
+
+    // For a rotated wall, the bounding box half-extent along X and Z axes:
+    // The wall spans from center ± halfLen along its local axis.
+    // In world coords, the extent along X is halfLen * |cos(rad)| and along Z is halfLen * |sin(rad)|.
+    // But since the wall is a line (not a rectangle), we only need to ensure the wall endpoints
+    // stay within bounds. The endpoints are at:
+    //   (x ± halfLen * cos(rad), z ± halfLen * sin(rad))
+    // So the center must be clamped so that both endpoints stay within [-L/2, L/2] and [-W/2, W/2].
+    // This gives: |x| <= L/2 - halfLen * |cos(rad)| and |z| <= W/2 - halfLen * |sin(rad)|
+    const extentX = halfLen * Math.abs(Math.cos(rad));
+    const extentZ = halfLen * Math.abs(Math.sin(rad));
+
+    const maxX = length / 2 - extentX;
+    const maxZ = width / 2 - extentZ;
+    const margin = 0.15;
+
+    // Auto-place if no position given
+    const count = partitions.length;
+    const defaultX = posX !== null ? posX : (-length / 2 + ((i + 1) * length) / (count + 1));
+    const defaultZ = posZ !== null ? posZ : (-width / 2 + ((i + 1) * width) / (count + 1));
+
+    // Clamp so the entire wall stays inside the building
+    const clampedX = Math.max(-maxX + margin, Math.min(maxX - margin, parseFloat(defaultX) || 0));
+    const clampedZ = Math.max(-maxZ + margin, Math.min(maxZ - margin, parseFloat(defaultZ) || 0));
+
+    return { partition: p, index: i, wallLen, wallH, x: clampedX, z: clampedZ, rotationDeg: rotDeg, rad };
   });
 }
 
@@ -49,11 +86,29 @@ export function getOpeningTransform(opening, layout, { length, width, thickness,
 
   const partMatch = wall.match(/^partition_(\d+)$/);
   if (partMatch && layout) {
-    const { z, wallLen } = layout;
+    const { x, z, wallLen, rad } = layout;
     const clampedOffset = Math.max(-wallLen / 2 + doorW / 2, Math.min(wallLen / 2 - doorW / 2, offset));
+    const worldX = x + clampedOffset * Math.cos(rad) + inset * Math.sin(rad);
+    const worldZ = z + clampedOffset * Math.sin(rad) + inset * Math.cos(rad);
     return {
-      position: [clampedOffset, y, z + inset],
-      rotation: [0, 0, 0],
+      position: [worldX, y, worldZ],
+      rotation: [0, rad, 0],
+      width: doorW,
+      height: doorH,
+      sill,
+    };
+  }
+
+  // Room partition openings (used by InternalRoom3D)
+  const roomPartMatch = wall.match(/^room(\d+)_partition_(\d+)$/);
+  if (roomPartMatch && layout) {
+    const { x, z, wallLen, rad } = layout;
+    const clampedOffset = Math.max(-wallLen / 2 + doorW / 2, Math.min(wallLen / 2 - doorW / 2, offset));
+    const worldX = x + clampedOffset * Math.cos(rad) + inset * Math.sin(rad);
+    const worldZ = z + clampedOffset * Math.sin(rad) + inset * Math.cos(rad);
+    return {
+      position: [worldX, y, worldZ],
+      rotation: [0, rad, 0],
       width: doorW,
       height: doorH,
       sill,
