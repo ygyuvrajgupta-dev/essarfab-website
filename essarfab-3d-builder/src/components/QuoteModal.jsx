@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, COLOR_OPTIONS, STRUCTURE_TYPES }) {
+function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, COLOR_OPTIONS, STRUCTURE_TYPES, ROOF_TYPE_OPTIONS }) {
   useEffect(() => {
     if (open) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "";
@@ -32,6 +32,9 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
       `Floor Area (each)   : ${(config.length * config.width).toFixed(2)} m²`,
       `Total Floor Area    : ${(config.length * config.width * floorCount).toFixed(2)} m²`,
       `Include Roof        : ${config.showRoof ? "Yes" : "No"}`,
+      `Roof Type           : ${config.showRoof ? (ROOF_TYPE_OPTIONS?.find(r => r.value === config.roofType)?.label || config.roofType || "Sandwich Panel") : "N/A"}`,
+      `Roof Thickness      : ${config.showRoof ? (config.roofThickness || 100) + " mm" : "N/A"}`,
+      `Roof Panel Width    : ${config.showRoof ? (config.roofWidth || 1150) + " mm" : "N/A"}`,
       `Panel Type          : ${config.panelType || "both"}`,
       "",
       "── Per-Floor Breakdown ────────────────────",
@@ -86,6 +89,9 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                 <tr><td>Floor Area (per floor)</td><td>{(config.length * config.width).toFixed(2)} m²</td></tr>
                 <tr><td>Total Floor Area</td><td>{(config.length * config.width * floorCount).toFixed(2)} m²</td></tr>
                 <tr><td>Roof Panels</td><td>{config.showRoof ? "Included" : "Not included"}</td></tr>
+                <tr><td>Roof Type</td><td>{config.showRoof ? (ROOF_TYPE_OPTIONS?.find(r => r.value === config.roofType)?.label || config.roofType || "Sandwich Panel") : "N/A"}</td></tr>
+                <tr><td>Roof Thickness</td><td>{config.showRoof ? (config.roofThickness || 100) + " mm" : "N/A"}</td></tr>
+                <tr><td>Roof Panel Width</td><td>{config.showRoof ? (config.roofWidth || 1150) + " mm" : "N/A"}</td></tr>
                 <tr><td>Panel Type</td><td>{config.panelType || "both"}</td></tr>
               </tbody>
             </table>

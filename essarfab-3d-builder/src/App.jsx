@@ -1,3 +1,6 @@
+
+
+
 import { useState, useMemo, Fragment } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Grid, Text } from "@react-three/drei";
@@ -55,6 +58,36 @@ const PANEL_TYPE_OPTIONS = [
   { value: "roof",  label: "🏠 Roof Only" },
 ];
 
+const ROOF_TYPE_OPTIONS = [
+  { value: "sandwich",     label: "🥪 Sandwich Panel (100 mm)" },
+  { value: "roofing",      label: "🛖 Roofing Panel (50 mm)" },
+  { value: "single_sided", label: "📐 Single-Sided PUF (75 mm)" },
+];
+
+const ROOF_THICKNESS_OPTIONS = {
+  roofing:      [50, 60, 70, 80, 90, 100, 110, 120, 130],
+  sandwich:     [100, 60, 50, 100, 120, 150],
+  single_sided: [100, 60, 50, 100, 120, 150],
+};
+
+const ROOF_WIDTH_OPTIONS = {
+  roofing:      [1000],
+  sandwich:     [1150, 1190, 1200],
+  single_sided: [1190, 1150, 1200],
+};
+
+const ROOF_DEFAULT_THICKNESS = {
+  roofing: 50,
+  sandwich: 100,
+  single_sided: 75,
+};
+
+const ROOF_DEFAULT_WIDTH = {
+  roofing: 1000,
+  sandwich: 1150,
+  single_sided: 1190,
+};
+
 const STEPS = [
   { id: 1, label: "Structure" },
   { id: 2, label: "Partitions" },
@@ -89,6 +122,11 @@ function createDefaultFloor(id, unit, index = 0) {
         label: "Main Door",
       },
     ],
+    // Per-floor roof configuration
+    roofType: "sandwich",
+    roofThickness: 100,
+    roofWidth: 1150,
+    showFloorRoof: false, // whether this floor has its own roof
   };
 }
 
@@ -117,7 +155,7 @@ function createDefaultRoom(id, unit) {
 }
 
 // ─── Calculator Core ─────────────────────────────────────────────────────────
-function calculate({ length, width, floors, panelType, showRoof, unit }) {
+function calculate({ length, width, floors, panelType, showRoof, roofType, roofThickness, roofWidth, unit }) {
   let totalPanels = 0;
   let totalArea = 0;
   let totalWeight = 0;
@@ -152,9 +190,14 @@ function calculate({ length, width, floors, panelType, showRoof, unit }) {
     const partitionRows = (floor.partitions || []).map((p, pi) => {
       const l = toM(parseFloat(p.length) || 0, unit);
       const h = toM(parseFloat(p.height) || floorHeightM, unit);
-      const deduct = (floor.openings || [])
+      // Deduct openings from building-level openings targeting this partition
+      let deduct = (floor.openings || [])
         .filter(o => o.wall === `floor${fi}_partition_${pi}`)
         .reduce((sum, o) => sum + (parseFloat(o.width) || 0) * (parseFloat(o.height) || 0), 0);
+      // Also deduct partition-level openings stored directly on the partition
+      if (p.openings && p.openings.length) {
+        deduct += p.openings.reduce((sum, o) => sum + (parseFloat(o.width) || 0) * (parseFloat(o.height) || 0), 0);
+      }
       const grossArea = l * h;
       const netArea = Math.max(0, grossArea - deduct);
       const panelCount = Math.ceil(l / floorPW);
@@ -239,17 +282,24 @@ function calculate({ length, width, floors, panelType, showRoof, unit }) {
       });
     }
 
-    // Roof — only on top floor
-    const isTopFloor = fi === floors.length - 1;
+    // Roof — per-floor support
     let roofArea = 0;
     let roofPanelCount = 0;
+    let floorRoofType = null;
+    let floorRoofThickness = null;
+    let floorRoofWidth = null;
 
-    if (isTopFloor && showRoof && (panelType === "roof" || panelType === "both")) {
+    const hasFloorRoof = floor.showFloorRoof && showRoof && (panelType === "roof" || panelType === "both");
+    if (hasFloorRoof) {
+      floorRoofType = floor.roofType || roofType;
+      floorRoofThickness = floor.roofThickness || roofThickness;
+      floorRoofWidth = floor.roofWidth || roofWidth;
       roofArea = length * width;
-      roofPanelCount = Math.ceil(length / floorPW) * Math.ceil(width / floorPW);
+      const roofPW = (floorRoofWidth || 1150) / 1000;
+      roofPanelCount = Math.ceil(length / roofPW) * Math.ceil(width / roofPW);
       floorPanels += roofPanelCount;
       floorArea += roofArea;
-      floorWeight += roofArea * 100 * 0.012;
+      floorWeight += roofArea * (floorRoofThickness || 100) * 0.012;
     }
 
     totalPanels += floorPanels;
@@ -270,6 +320,9 @@ function calculate({ length, width, floors, panelType, showRoof, unit }) {
       panelColor: floor.panelColor,
       panelWidthMM: floor.panelWidthMM,
       wallThickness: wallT,
+      floorRoofType,
+      floorRoofThickness,
+      floorRoofWidth,
     });
 
     cumulativeHeight += floorHeightM;
@@ -417,8 +470,16 @@ function InternalRoom3D({ room, index, floorHeight, yOffset, unit, length, width
 function Scene({ length, width, floors, showRoof, unit, panelType }) {
   const floorHeights = floors.map(f => toM(parseFloat(f.height) || 4, unit));
   const totalBuildingHeight = floorHeights.reduce((a, b) => a + b, 0);
-  const allDoors = floors.flatMap(f => (f.openings || []).filter(o => o.type === "door")).length;
-  const allWindows = floors.flatMap(f => (f.openings || []).filter(o => o.type === "window")).length;
+  const allDoors = floors.reduce((s, f) => 
+    s + (f.openings || []).filter(o => o.type === "door").length 
+    + (f.internalRooms || []).reduce((rs, r) => rs + (r.openings || []).filter(o => o.type === "door").length, 0)
+    + (f.partitions || []).reduce((ps, p) => ps + (p.openings || []).filter(o => o.type === "door").length, 0)
+  , 0);
+  const allWindows = floors.reduce((s, f) => 
+    s + (f.openings || []).filter(o => o.type === "window").length 
+    + (f.internalRooms || []).reduce((rs, r) => rs + (r.openings || []).filter(o => o.type === "window").length, 0)
+    + (f.partitions || []).reduce((ps, p) => ps + (p.openings || []).filter(o => o.type === "window").length, 0)
+  , 0);
   const allPartitions = floors.reduce((s, f) => s + (f.partitions || []).length, 0);
   const allRooms = floors.reduce((s, f) => s + (f.internalRooms || []).length, 0);
 
@@ -477,7 +538,7 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
 
     const showWalls = panelType === "wall" || panelType === "both";
     const showRoofPanel =
-      isTopFloor && showRoof && (panelType === "roof" || panelType === "both");
+      floor.showFloorRoof && showRoof && (panelType === "roof" || panelType === "both");
 
     floorElements.push(
       <Fragment key={floor.id ?? fi}>
@@ -723,6 +784,9 @@ export default function App() {
 
   const [panelType, setPanelType] = useState("both");
   const [showRoof, setShowRoof] = useState(true);
+  const [roofType, setRoofType] = useState("sandwich");
+  const [roofThickness, setRoofThickness] = useState(ROOF_DEFAULT_THICKNESS.sandwich);
+  const [roofWidth, setRoofWidth] = useState(ROOF_DEFAULT_WIDTH.sandwich);
 
   const [quoteOpen, setQuoteOpen] = useState(false);
 
@@ -735,8 +799,8 @@ export default function App() {
   const widthM = toM(width, unit);
 
   const calc = useMemo(
-    () => calculate({ length: lengthM, width: widthM, floors, panelType, showRoof, unit }),
-    [lengthM, widthM, floors, panelType, showRoof, unit]
+    () => calculate({ length: lengthM, width: widthM, floors, panelType, showRoof, roofType, roofThickness, roofWidth, unit }),
+    [lengthM, widthM, floors, panelType, showRoof, roofType, roofThickness, roofWidth, unit]
   );
 
   const addFloor = () => {
@@ -910,8 +974,16 @@ export default function App() {
   const displayUnit = unit === "m" ? "m" : "ft";
   const areaUnitLabel = unit === "m" ? "m²" : "sq. ft";
 
-  const doorCount = floors.reduce((s, f) => s + (f.openings || []).filter(o => o.type === "door").length + (f.internalRooms || []).reduce((rs, r) => rs + (r.openings || []).filter(o => o.type === "door").length, 0), 0);
-  const windowCount = floors.reduce((s, f) => s + (f.openings || []).filter(o => o.type === "window").length + (f.internalRooms || []).reduce((rs, r) => rs + (r.openings || []).filter(o => o.type === "window").length, 0), 0);
+  const doorCount = floors.reduce((s, f) => 
+    s + (f.openings || []).filter(o => o.type === "door").length 
+    + (f.internalRooms || []).reduce((rs, r) => rs + (r.openings || []).filter(o => o.type === "door").length, 0)
+    + (f.partitions || []).reduce((ps, p) => ps + (p.openings || []).filter(o => o.type === "door").length, 0)
+  , 0);
+  const windowCount = floors.reduce((s, f) => 
+    s + (f.openings || []).filter(o => o.type === "window").length 
+    + (f.internalRooms || []).reduce((rs, r) => rs + (r.openings || []).filter(o => o.type === "window").length, 0)
+    + (f.partitions || []).reduce((ps, p) => ps + (p.openings || []).filter(o => o.type === "window").length, 0)
+  , 0);
   const partitionCount = floors.reduce((s, f) => s + (f.partitions || []).length, 0);
   const roomCount = floors.reduce((s, f) => s + (f.internalRooms || []).length, 0);
 
@@ -989,6 +1061,39 @@ export default function App() {
                         </div>
                       </label>
                     </div>
+                    {/* Per-floor roof toggle */}
+                    <label className="toggle-label" style={{fontSize:"11px",marginTop:"2px"}}>
+                      <input type="checkbox" checked={!!f.showFloorRoof}
+                        onChange={e => updateFloor(f.id, "showFloorRoof", e.target.checked)} />
+                      Include Roof/Ceiling for this floor
+                    </label>
+                    {f.showFloorRoof && showRoof && (
+                      <div className="dim-row two-col" style={{marginTop:"4px",gap:"6px"}}>
+                        <label style={{fontSize:"10px"}}>Roof Type
+                          <select value={f.roofType || "sandwich"} onChange={e => {
+                            updateFloor(f.id, "roofType", e.target.value);
+                            updateFloor(f.id, "roofThickness", ROOF_DEFAULT_THICKNESS[e.target.value] || 100);
+                            updateFloor(f.id, "roofWidth", ROOF_DEFAULT_WIDTH[e.target.value] || 1150);
+                          }}>
+                            {ROOF_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                        </label>
+                        <label style={{fontSize:"10px"}}>Thickness
+                          <select value={f.roofThickness || 100} onChange={e => updateFloor(f.id, "roofThickness", Number(e.target.value))}>
+                            {(ROOF_THICKNESS_OPTIONS[f.roofType || "sandwich"] || [100]).map(t => (
+                              <option key={t} value={t}>{t} mm</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label style={{fontSize:"10px"}}>Width
+                          <select value={f.roofWidth || 1150} onChange={e => updateFloor(f.id, "roofWidth", Number(e.target.value))}>
+                            {(ROOF_WIDTH_OPTIONS[f.roofType || "sandwich"] || [1150]).map(w => (
+                              <option key={w} value={w}>{w} mm</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    )}
                   </div>
                 ))}
                 <button className="btn btn-outline full-width add-btn" onClick={addFloor} style={{marginTop:"6px"}}>+ Add Another Floor</button>
@@ -1245,6 +1350,35 @@ export default function App() {
                 </label>
               </div>
 
+              {showRoof && (
+                <div className="panel-type-section">
+                  <div className="panel-type-heading">🏠 Roof Configuration</div>
+                  <label>Roof Panel Type
+                    <select value={roofType} onChange={e => {
+                      setRoofType(e.target.value);
+                      setRoofThickness(ROOF_DEFAULT_THICKNESS[e.target.value] || 100);
+                      setRoofWidth(ROOF_DEFAULT_WIDTH[e.target.value] || 1150);
+                    }}>
+                      {ROOF_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </label>
+                  <label>Roof Panel Thickness (mm)
+                    <select value={roofThickness} onChange={e => setRoofThickness(Number(e.target.value))}>
+                      {(ROOF_THICKNESS_OPTIONS[roofType] || [100]).map(t => (
+                        <option key={t} value={t}>{t} mm</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>Roof Panel Width (mm)
+                    <select value={roofWidth} onChange={e => setRoofWidth(Number(e.target.value))}>
+                      {(ROOF_WIDTH_OPTIONS[roofType] || [1150]).map(w => (
+                        <option key={w} value={w}>{w} mm</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
+
               <div className="info-box"><strong>λ = 0.021 W/mK</strong> · Density 40±2 kg/m³ · CFC-free · Fire rated IS 12436</div>
             </div>
           )}
@@ -1311,6 +1445,25 @@ export default function App() {
                 <span>Panel Type: <strong>{PANEL_TYPE_OPTIONS.find(p => p.value === panelType)?.label || panelType}</strong></span>
                 <span>Dimensions: <strong>{fmt(lengthM, "m")}m × {fmt(widthM, "m")}m × {fmt(totalHeightM, "m")}m</strong></span>
                 <span>Floor Area: <strong>{(lengthM * widthM).toFixed(1)} m² × {floors.length} floors</strong></span>
+                {showRoof && <span>Roof Type: <strong>{ROOF_TYPE_OPTIONS.find(r => r.value === roofType)?.label || roofType}</strong></span>}
+              </div>
+
+              {/* Area Breakdown */}
+              <div className="area-breakdown">
+                <div className="area-breakdown-title">📐 Area Breakdown</div>
+                {calc.floorResults.map((fr, fi) => {
+                  const wallArea = fr.wallRows.reduce((s, w) => s + w.netArea, 0) + fr.partitionRows.reduce((s, p) => s + p.netArea, 0);
+                  const roomArea = fr.roomRows.reduce((s, r) => s + r.totalArea, 0);
+                  const roofArea = fr.roofArea || 0;
+                  return (
+                    <div key={fi} className="area-breakdown-row">
+                      <span className="area-label">{fr.label}</span>
+                      <span className="area-value">🧱 Walls: <strong>{wallArea.toFixed(1)} m²</strong></span>
+                      <span className="area-value">🏠 Rooms: <strong>{roomArea.toFixed(1)} m²</strong></span>
+                      {roofArea > 0 && <span className="area-value">🟠 Roof: <strong>{roofArea.toFixed(1)} m²</strong></span>}
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="results-table-wrap">
@@ -1334,7 +1487,7 @@ export default function App() {
                           <tr key={`rm-${ri}`}><td style={{color:"var(--accent)"}}>🏠 {rm.label}</td><td>{rm.totalArea.toFixed(1)}</td><td>{rm.totalArea.toFixed(1)}</td><td><strong>{rm.totalPanels}</strong></td></tr>
                         ))}
                         {fr.roofArea > 0 && (
-                          <tr><td style={{color:"var(--accent)"}}>🟠 Roof</td><td>{fr.roofArea.toFixed(1)}</td><td>{fr.roofArea.toFixed(1)}</td><td><strong>{fr.roofPanelCount}</strong></td></tr>
+                          <tr><td style={{color:"var(--accent)"}}>🟠 Roof{fr.floorRoofType ? ` (${ROOF_TYPE_OPTIONS.find(r => r.value === fr.floorRoofType)?.label || fr.floorRoofType})` : ""}</td><td>{fr.roofArea.toFixed(1)}</td><td>{fr.roofArea.toFixed(1)}</td><td><strong>{fr.roofPanelCount}</strong></td></tr>
                         )}
                       </tbody>
                     </table>
@@ -1374,13 +1527,14 @@ export default function App() {
         open={quoteOpen}
         onClose={() => setQuoteOpen(false)}
         config={{ length: lengthM, width: widthM, totalHeight: totalHeightM, displayLength: length, displayWidth: width,
-          displayTotalHeight: fmt(totalHeightM, unit, 1), structureType, showRoof, unit, panelType, floors: floors.length, panelWidthMM: 1200, panelThickness: 100 }}
+          displayTotalHeight: fmt(totalHeightM, unit, 1), structureType, showRoof, roofType, roofThickness, roofWidth, unit, panelType, floors: floors.length, panelWidthMM: 1200, panelThickness: 100 }}
         calc={calc}
         floors={floors}
         unit={unit}
         displayUnit={displayUnit}
         COLOR_OPTIONS={COLOR_OPTIONS}
         STRUCTURE_TYPES={STRUCTURE_TYPES}
+        ROOF_TYPE_OPTIONS={ROOF_TYPE_OPTIONS}
       />
     </div>
   );
