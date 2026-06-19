@@ -897,6 +897,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login onLogin={handleLogin} />} />
+      <Route path="/" element={<DeviceHistory />} />
       <Route path="/device-history" element={<DeviceHistory />} />
       <Route path="/builder" element={
         <ProtectedRoute>
