@@ -47,6 +47,15 @@ const WALL_THICKNESS_RECOMMENDED_WIDTHS = {
   150: 1000,
 };
 
+// Standard PUF panel heights (mm internally)
+const STANDARD_PANEL_HEIGHTS_MM = [2895.6, 3048, 3657.6, 9144]; // 9.5ft, 10ft, 12ft, 30ft in mm
+const STANDARD_PANEL_HEIGHTS_LABELS = {
+  2895.6: "9.5 ft (2.90 m)",
+  3048: "10 ft (3.05 m)",
+  3657.6: "12 ft (3.66 m)",
+  9144: "30 ft (9.14 m)",
+};
+
 const COLOR_OPTIONS = [
   { hex: "#f5f5f5", name: "White" },
   { hex: "#fffde7", name: "Ivory" },
@@ -122,6 +131,7 @@ function createDefaultFloor(id, unit, index = 0) {
     height: unit === "ft" ? String(13.1) : "4",
     panelColor: "#f5f5f5",
     panelWidthMM: 1200,
+    panelHeightMM: 2895.6, // default 9.5 ft
     wallThickness: 100,
     partitions: [],
     internalRooms: [],
@@ -193,7 +203,9 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
         .filter(o => o.wall === w.id.replace(`floor${fi}_`, ""))
         .reduce((sum, o) => sum + (parseFloat(o.width) || 0) * (parseFloat(o.height) || 0), 0);
       const netArea = Math.max(0, grossArea - openingDeduction);
-      const panelCount = Math.ceil(w.wallLen / floorPW);
+      // Area-based panel count: net area / (panel width × panel height)
+      const panelH = (floor.panelHeightMM || 2895.6) / 1000; // default 9.5ft in meters
+      const panelCount = netArea / (floorPW * panelH);
       return { ...w, grossArea, openingDeduction, netArea, panelCount };
     });
 
@@ -211,7 +223,9 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       }
       const grossArea = l * h;
       const netArea = Math.max(0, grossArea - deduct);
-      const panelCount = Math.ceil(l / floorPW);
+      // Area-based panel count
+      const panelH = (floor.panelHeightMM || 2895.6) / 1000;
+      const panelCount = netArea / (floorPW * panelH);
       return { label: p.label || `Partition ${pi + 1}`, grossArea, netArea, panelCount, deduct, length: l, height: h };
     });
 
@@ -241,19 +255,22 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
           .filter(o => o.wall === w.id.replace(`room${ri}_`, ""))
           .reduce((sum, o) => sum + (parseFloat(o.width) || 0) * (parseFloat(o.height) || 0), 0);
         const netArea = Math.max(0, grossArea - openingDeduction);
-        const pCount = Math.ceil(w.wallLen / rPW);
+        // Area-based panel count
+        const rPanelH = (rm.panelHeightMM || 2895.6) / 1000;
+        const pCount = netArea / (rPW * rPanelH);
         return { ...w, grossArea, openingDeduction, netArea, panelCount: pCount };
       });
 
       const roomWallPanels = rWallRows.reduce((s, w) => s + w.panelCount, 0);
       const roomWallArea = rWallRows.reduce((s, w) => s + w.netArea, 0);
 
-      // Ceiling
+      // Ceiling — area-based panel count
       let ceilingPanels = 0;
       let ceilingArea = 0;
       if (rm.showCeiling) {
         ceilingArea = rl * rw;
-        ceilingPanels = Math.ceil(rl / rPW) * Math.ceil(rw / rPW);
+        const rCeilPanelH = (rm.panelHeightMM || 2895.6) / 1000;
+        ceilingPanels = ceilingArea / (rPW * rCeilPanelH);
       }
 
       return {
@@ -1334,6 +1351,14 @@ export default function App() {
                 </select>
               </label>
 
+              <label>Standard Panel Height
+                <select value={currentFloor?.panelHeightMM || 2895.6} onChange={e => updateFloor(currentFloorId, "panelHeightMM", Number(e.target.value))}>
+                  {STANDARD_PANEL_HEIGHTS_MM.map(h => (
+                    <option key={h} value={h}>{STANDARD_PANEL_HEIGHTS_LABELS[h] || `${h} mm`}</option>
+                  ))}
+                </select>
+              </label>
+
               <div className="field">
                 <span className="field-label">Panel Color / Finish</span>
                 <div className="color-swatches">
@@ -1369,36 +1394,10 @@ export default function App() {
                   <input type="checkbox" checked={showRoof} onChange={e => setShowRoof(e.target.checked)} />
                   Include Roof in calculation & 3D view
                 </label>
+                <p style={{fontSize:"10px",color:"var(--text-muted)",margin:"4px 0 0"}}>
+                  Roof type, thickness & width are configured per-floor in Step 1.
+                </p>
               </div>
-
-              {showRoof && (
-                <div className="panel-type-section">
-                  <div className="panel-type-heading">🏠 Roof Configuration</div>
-                  <label>Roof Panel Type
-                    <select value={roofType} onChange={e => {
-                      setRoofType(e.target.value);
-                      setRoofThickness(ROOF_DEFAULT_THICKNESS[e.target.value] || 100);
-                      setRoofWidth(ROOF_DEFAULT_WIDTH[e.target.value] || 1150);
-                    }}>
-                      {ROOF_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                  </label>
-                  <label>Roof Panel Thickness (mm)
-                    <select value={roofThickness} onChange={e => setRoofThickness(Number(e.target.value))}>
-                      {(ROOF_THICKNESS_OPTIONS[roofType] || [100]).map(t => (
-                        <option key={t} value={t}>{t} mm</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>Roof Panel Width (mm)
-                    <select value={roofWidth} onChange={e => setRoofWidth(Number(e.target.value))}>
-                      {(ROOF_WIDTH_OPTIONS[roofType] || [1150]).map(w => (
-                        <option key={w} value={w}>{w} mm</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              )}
 
               <div className="info-box"><strong>λ = 0.021 W/mK</strong> · Density 40±2 kg/m³ · CFC-free · Fire rated IS 12436</div>
             </div>
