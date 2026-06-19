@@ -22,7 +22,7 @@ export default function Login({ onLogin }) {
     <div className="login-page">
       <div className="login-brand">
         <div className="login-logo">
-          <img src="../Essarfab%20logo.png" alt="ESSARFAB GREEN INDIA" />
+          <img src="C:\Users\Lenovo\OneDrive\Desktop\project 2030\ESSARFAB WEB SITE\essarfab-website\essarfab-3d-builder\src\assets\Essarfab logo.png" alt="ESSARFAB GREEN INDIA" />
         </div>
         <h1 className="login-brand-name">ESSARFAB GREEN INDIA</h1>
         <p className="login-brand-tagline">PUF Panel Calculator & 3D Builder</p>
