@@ -33,8 +33,19 @@ function fmt(val, unit, decimals = 1) {
 const PANEL_WIDTH_OPTIONS = [
   { label: "1000 mm", value: 1.0 },
   { label: "1150 mm", value: 1.15 },
+  { label: "1190 mm", value: 1.19 },
   { label: "1200 mm", value: 1.2 },
 ];
+
+// Recommended panel widths (mm) by wall thickness (mm)
+const WALL_THICKNESS_RECOMMENDED_WIDTHS = {
+  50:  1190,
+  60:  1190,
+  80:  1150,
+  100: 1150,
+  120: 1000,
+  150: 1000,
+};
 
 const COLOR_OPTIONS = [
   { hex: "#f5f5f5", name: "White" },
@@ -1315,7 +1326,11 @@ export default function App() {
 
               <label>Standard Panel Width
                 <select value={currentFloor?.panelWidthMM || 1200} onChange={e => updateFloor(currentFloorId, "panelWidthMM", Number(e.target.value))}>
-                  {PANEL_WIDTH_OPTIONS.map(o => <option key={o.value} value={o.value * 1000}>{o.label}</option>)}
+                  {PANEL_WIDTH_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value * 1000}>
+                      {o.label}{WALL_THICKNESS_RECOMMENDED_WIDTHS[currentFloor?.wallThickness] === o.value * 1000 ? " ✓" : ""}
+                    </option>
+                  ))}
                 </select>
               </label>
 
@@ -1332,7 +1347,13 @@ export default function App() {
               </div>
 
               <label>Wall Panel Thickness
-                <select value={currentFloor?.wallThickness || 100} onChange={e => updateFloor(currentFloorId, "wallThickness", Number(e.target.value))}>
+                <select value={currentFloor?.wallThickness || 100} onChange={e => {
+                  const newThick = Number(e.target.value);
+                  updateFloor(currentFloorId, "wallThickness", newThick);
+                  const recWidth = WALL_THICKNESS_RECOMMENDED_WIDTHS[newThick] || 1150;
+                  updateFloor(currentFloorId, "panelWidthMM", recWidth);
+                }}>
+                  <option value={50}>50 mm — Light</option>
                   <option value={60}>60 mm — Light insulation</option>
                   <option value={80}>80 mm — Standard</option>
                   <option value={100}>100 mm — Cold Room (default)</option>
@@ -1413,7 +1434,7 @@ export default function App() {
                     <span>{f.label || `Floor ${i + 1}`}:</span>
                     <select value={f.wallThickness} onChange={e => updateFloor(f.id, "wallThickness", Number(e.target.value))}
                       style={{width:"auto",minWidth:"120px",marginLeft:"auto"}}>
-                      <option value={60}>60 mm</option><option value={80}>80 mm</option>
+                      <option value={50}>50 mm</option><option value={60}>60 mm</option><option value={80}>80 mm</option>
                       <option value={100}>100 mm</option><option value={120}>120 mm</option>
                       <option value={150}>150 mm</option>
                     </select>
