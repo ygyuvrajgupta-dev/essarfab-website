@@ -65,7 +65,7 @@ export default function DeviceHistory() {
     <div className="device-history-page">
       <div className="device-history-brand">
         <div className="device-history-logo">
-          <img src="../Essarfab%20logo.png" alt="ESSARFAB GREEN INDIA" />
+          <img src="/Essarfab%20logo.png" alt="ESSARFAB GREEN INDIA" />
         </div>
         <h1>Device History</h1>
         <p>Manage your authorized devices for the 3D Builder</p>
