@@ -739,6 +739,7 @@ export default function App() {
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [showRoomMaker, setShowRoomMaker] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState(null);
+  const [resultsUnit, setResultsUnit] = useState("m");
 
   const currentFloor = floors.find(f => f.id === currentFloorId) || floors[0];
   const totalHeightM = floors.reduce((s, f) => s + toM(parseFloat(f.height) || 4, unit), 0);
@@ -1290,18 +1291,26 @@ export default function App() {
                   <div className="step-content results-content">
                     <div className="step-title">📊 Panel Calculation Results</div>
 
+                    <div className="unit-toggle" style={{marginBottom:"8px"}}>
+                      <span className="field-label">View Results In</span>
+                      <div className="unit-btns">
+                        <button className={`unit-btn${resultsUnit === "m" ? " active" : ""}`} onClick={() => setResultsUnit("m")}>Square Meters (m²)</button>
+                        <button className={`unit-btn${resultsUnit === "ft" ? " active" : ""}`} onClick={() => setResultsUnit("ft")}>Square Feet (sq. ft)</button>
+                      </div>
+                    </div>
+
                     <div className="results-summary-grid">
                       <div className="result-stat accent"><span className="rs-val">{calc.totalPanels}</span><span className="rs-label">Total Panels</span></div>
-                      <div className="result-stat"><span className="rs-val">{calc.totalArea.toFixed(1)}</span><span className="rs-label">Total Area (m²)</span></div>
+                      <div className="result-stat"><span className="rs-val">{fmt(calc.totalArea, resultsUnit === "ft" ? "ft" : "m", 1)}</span><span className="rs-label">Total Area ({resultsUnit === "ft" ? "sq. ft" : "m²"})</span></div>
                       <div className="result-stat"><span className="rs-val">{calc.totalWeight.toFixed(0)}</span><span className="rs-label">Est. Weight (kg)</span></div>
                       <div className="result-stat"><span className="rs-val">{floors.length}</span><span className="rs-label">Floors</span></div>
                     </div>
 
                     <div className="dim-summary" style={{justifyContent:"center"}}>
                       <span>Panel Type: <strong>{PANEL_TYPE_OPTIONS.find(p => p.value === panelType)?.label || panelType}</strong></span>
-                      <span>Dimensions: <strong>{fmt(lengthM, "m")}m × {fmt(widthM, "m")}m × {fmt(totalHeightM, "m")}m</strong></span>
-                      <span>Floor Area: <strong>{(lengthM * widthM).toFixed(1)} m² × {floors.length} floors</strong></span>
-                      {showRoof && <span>Roof Type: <strong>{ROOF_TYPE_OPTIONS.find(r => r.value === roofType)?.label || roofType}</strong></span>}
+                      <span>Dimensions: <strong>{fmt(lengthM, resultsUnit)} {resultsUnit === "ft" ? "ft" : "m"} × {fmt(widthM, resultsUnit)} {resultsUnit === "ft" ? "ft" : "m"} × {fmt(totalHeightM, resultsUnit)} {resultsUnit === "ft" ? "ft" : "m"}</strong></span>
+                      <span>Floor Area: <strong>{fmt(lengthM * widthM, resultsUnit === "ft" ? "ft" : "m", 1)} {resultsUnit === "ft" ? "sq. ft" : "m²"} × {floors.length} floors</strong></span>
+                      {showRoof && <span>Roof: <strong>Included</strong></span>}
                     </div>
 
                     <div className="area-breakdown">
@@ -1310,44 +1319,52 @@ export default function App() {
                         const wallArea = fr.wallRows.reduce((s, w) => s + w.netArea, 0) + fr.partitionRows.reduce((s, p) => s + p.netArea, 0);
                         const roomArea = fr.roomRows.reduce((s, r) => s + r.totalArea, 0);
                         const roofArea = fr.roofArea || 0;
+                        const ru = resultsUnit;
+                        const areaConv = ru === "ft" ? FT_PER_M * FT_PER_M : 1;
+                        const al = ru === "ft" ? "sq. ft" : "m²";
                         return (
                           <div key={fi} className="area-breakdown-row">
                             <span className="area-label">{fr.label}</span>
-                            <span className="area-value">🧱 Walls: <strong>{wallArea.toFixed(1)} m²</strong></span>
-                            <span className="area-value">🏠 Rooms: <strong>{roomArea.toFixed(1)} m²</strong></span>
-                            {roofArea > 0 && <span className="area-value">🟠 Roof: <strong>{roofArea.toFixed(1)} m²</strong></span>}
+                            <span className="area-value">🧱 Walls: <strong>{(wallArea * areaConv).toFixed(1)} {al}</strong></span>
+                            <span className="area-value">🏠 Rooms: <strong>{(roomArea * areaConv).toFixed(1)} {al}</strong></span>
+                            {roofArea > 0 && <span className="area-value">🟠 Roof: <strong>{(roofArea * areaConv).toFixed(1)} {al}</strong></span>}
                           </div>
                         );
                       })}
                     </div>
 
                     <div className="results-table-wrap">
-                      {calc.floorResults.map((fr, fi) => (
-                        <div key={fi} className="floor-result-section">
-                          <div className="floor-result-header">
-                            <span className="floor-color-dot" style={{background: fr.panelColor}} />
-                            <strong>{fr.label}</strong>
-                            <span style={{marginLeft:"auto",fontSize:"11px",color:"var(--text-muted)"}}>{fr.floorPanels} panels · {fr.floorArea.toFixed(1)} m²</span>
+                      {calc.floorResults.map((fr, fi) => {
+                        const ru = resultsUnit;
+                        const areaConv = ru === "ft" ? FT_PER_M * FT_PER_M : 1;
+                        const al = ru === "ft" ? "sq. ft" : "m²";
+                        return (
+                          <div key={fi} className="floor-result-section">
+                            <div className="floor-result-header">
+                              <span className="floor-color-dot" style={{background: fr.panelColor}} />
+                              <strong>{fr.label}</strong>
+                              <span style={{marginLeft:"auto",fontSize:"11px",color:"var(--text-muted)"}}>{fr.floorPanels} panels · {(fr.floorArea * areaConv).toFixed(1)} {al}</span>
+                            </div>
+                            <table className="calc-table">
+                              <thead><tr><th>Component</th><th>Gross {al}</th><th>Net {al}</th><th>Panels</th></tr></thead>
+                              <tbody>
+                                {fr.wallRows.map(w => (
+                                  <tr key={w.id}><td>{w.label.replace(`${fr.label} - `, "")}</td><td>{(w.grossArea * areaConv).toFixed(1)}</td><td>{(w.netArea * areaConv).toFixed(1)}</td><td><strong>{w.panelCount}</strong></td></tr>
+                                ))}
+                                {fr.partitionRows.map((p, pi) => (
+                                  <tr key={`p-${pi}`}><td style={{color:"var(--primary-light)"}}>{p.label}</td><td>{(p.grossArea * areaConv).toFixed(1)}</td><td>{(p.netArea * areaConv).toFixed(1)}</td><td><strong>{p.panelCount}</strong></td></tr>
+                                ))}
+                                {(fr.roomRows || []).map((rm, ri) => (
+                                  <tr key={`rm-${ri}`}><td style={{color:"var(--accent)"}}>🏠 {rm.label}</td><td>{(rm.totalArea * areaConv).toFixed(1)}</td><td>{(rm.totalArea * areaConv).toFixed(1)}</td><td><strong>{rm.totalPanels}</strong></td></tr>
+                                ))}
+                                {fr.roofArea > 0 && (
+                                  <tr><td style={{color:"var(--accent)"}}>🟠 Roof{fr.floorRoofType ? ` (${ROOF_TYPE_OPTIONS.find(r => r.value === fr.floorRoofType)?.label || fr.floorRoofType})` : ""}</td><td>{(fr.roofArea * areaConv).toFixed(1)}</td><td>{(fr.roofArea * areaConv).toFixed(1)}</td><td><strong>{fr.roofPanelCount}</strong></td></tr>
+                                )}
+                              </tbody>
+                            </table>
                           </div>
-                          <table className="calc-table">
-                            <thead><tr><th>Component</th><th>Gross {areaUnitLabel}</th><th>Net {areaUnitLabel}</th><th>Panels</th></tr></thead>
-                            <tbody>
-                              {fr.wallRows.map(w => (
-                                <tr key={w.id}><td>{w.label.replace(`${fr.label} - `, "")}</td><td>{w.grossArea.toFixed(1)}</td><td>{w.netArea.toFixed(1)}</td><td><strong>{w.panelCount}</strong></td></tr>
-                              ))}
-                              {fr.partitionRows.map((p, pi) => (
-                                <tr key={`p-${pi}`}><td style={{color:"var(--primary-light)"}}>{p.label}</td><td>{p.grossArea.toFixed(1)}</td><td>{p.netArea.toFixed(1)}</td><td><strong>{p.panelCount}</strong></td></tr>
-                              ))}
-                              {(fr.roomRows || []).map((rm, ri) => (
-                                <tr key={`rm-${ri}`}><td style={{color:"var(--accent)"}}>🏠 {rm.label}</td><td>{rm.totalArea.toFixed(1)}</td><td>{rm.totalArea.toFixed(1)}</td><td><strong>{rm.totalPanels}</strong></td></tr>
-                              ))}
-                              {fr.roofArea > 0 && (
-                                <tr><td style={{color:"var(--accent)"}}>🟠 Roof{fr.floorRoofType ? ` (${ROOF_TYPE_OPTIONS.find(r => r.value === fr.floorRoofType)?.label || fr.floorRoofType})` : ""}</td><td>{fr.roofArea.toFixed(1)}</td><td>{fr.roofArea.toFixed(1)}</td><td><strong>{fr.roofPanelCount}</strong></td></tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     <button className="btn btn-primary full-width quote-btn" onClick={() => setQuoteOpen(true)}>📄 Generate Full Quote Summary</button>
@@ -1382,7 +1399,7 @@ export default function App() {
               open={quoteOpen}
               onClose={() => setQuoteOpen(false)}
               config={{ length: lengthM, width: widthM, totalHeight: totalHeightM, displayLength: length, displayWidth: width,
-                displayTotalHeight: fmt(totalHeightM, unit, 1), structureType, showRoof, roofType, roofThickness, roofWidth, unit, panelType, floors: floors.length, panelWidthMM: 1200, panelThickness: 100 }}
+                displayTotalHeight: fmt(totalHeightM, unit, 1), structureType, showRoof, roofType, roofThickness, roofWidth, unit, panelType, floors: floors.length, panelWidthMM: floors[0]?.panelWidthMM || 1200, panelThickness: floors[0]?.wallThickness || 100 }}
               calc={calc}
               floors={floors}
               unit={unit}

@@ -1,5 +1,11 @@
 import { useEffect } from "react";
 
+const FT_PER_M = 3.28084;
+
+function getAreaInUnit(areaM2, unit) {
+  return unit === "ft" ? areaM2 * FT_PER_M * FT_PER_M : areaM2;
+}
+
 function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, COLOR_OPTIONS, STRUCTURE_TYPES, ROOF_TYPE_OPTIONS }) {
   useEffect(() => {
     if (open) document.body.style.overflow = "hidden";
@@ -15,7 +21,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
 
   const displayL = config.displayLength ?? config.length;
   const displayW = config.displayWidth ?? config.width;
-  const displayH = config.displayTotalHeight ?? (config.totalHeight ? (unit === "m" ? config.totalHeight.toFixed(1) : (config.totalHeight * 3.28084).toFixed(1)) : "—");
+  const displayH = config.displayTotalHeight ?? (config.totalHeight ? (unit === "m" ? config.totalHeight.toFixed(1) : (config.totalHeight * FT_PER_M).toFixed(1)) : "—");
 
   const floorCount = config.floors || floors?.length || 1;
 
@@ -29,23 +35,29 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
       `Project Type        : ${structName}`,
       `Dimensions          : ${displayL}${du} (L) × ${displayW}${du} (W) × ${displayH}${du} (H)`,
       `Floors              : ${floorCount}`,
-      `Floor Area (each)   : ${(config.length * config.width).toFixed(2)} m²`,
-      `Total Floor Area    : ${(config.length * config.width * floorCount).toFixed(2)} m²`,
-      `Include Roof        : ${config.showRoof ? "Yes" : "No"}`,
-      `Roof Type           : ${config.showRoof ? (ROOF_TYPE_OPTIONS?.find(r => r.value === config.roofType)?.label || config.roofType || "Sandwich Panel") : "N/A"}`,
-      `Roof Thickness      : ${config.showRoof ? (config.roofThickness || 100) + " mm" : "N/A"}`,
-      `Roof Panel Width    : ${config.showRoof ? (config.roofWidth || 1150) + " mm" : "N/A"}`,
+      `Floor Area (each)   : ${getAreaInUnit(config.length * config.width, unit).toFixed(2)} ${au}`,
+      `Total Floor Area    : ${getAreaInUnit(config.length * config.width * floorCount, unit).toFixed(2)} ${au}`,
+      `Include Roof        : ${config.showRoof ? "Yes (see per-floor details below)" : "No"}`,
       `Panel Type          : ${config.panelType || "both"}`,
       "",
       "── Per-Floor Breakdown ────────────────────",
-      ...(calc.floorResults || []).flatMap((fr, fi) => [
-        `  ${fr.label || `Floor ${fi + 1}`}:`,
-        `    Wall Panels:    ${fr.floorPanels} panels · ${fr.floorArea.toFixed(2)} ${au}`,
-        `    Est. Weight:    ${fr.floorWeight.toFixed(0)} kg`,
-        `    Wall Color:     ${COLOR_OPTIONS?.find(c => c.hex === fr.panelColor)?.name || fr.panelColor}`,
-        `    Wall Thickness: ${fr.wallThickness} mm`,
-        "",
-      ]),
+      ...(calc.floorResults || []).flatMap((fr, fi) => {
+        const roofLines = fr.roofArea > 0 && fr.floorRoofType ? [
+          `    Roof Type:      ${ROOF_TYPE_OPTIONS?.find(r => r.value === fr.floorRoofType)?.label || fr.floorRoofType}`,
+          `    Roof Thickness: ${fr.floorRoofThickness || 100} mm`,
+          `    Roof Width:     ${fr.floorRoofWidth || 1150} mm`,
+          `    Roof Panels:    ${fr.roofPanelCount} panels · ${fr.roofArea.toFixed(2)} ${au}`,
+        ] : [];
+        return [
+          `  ${fr.label || `Floor ${fi + 1}`}:`,
+          `    Wall Panels:    ${fr.floorPanels} panels · ${fr.floorArea.toFixed(2)} ${au}`,
+          `    Est. Weight:    ${fr.floorWeight.toFixed(0)} kg`,
+          `    Wall Color:     ${COLOR_OPTIONS?.find(c => c.hex === fr.panelColor)?.name || fr.panelColor}`,
+          `    Wall Thickness: ${fr.wallThickness} mm`,
+          ...roofLines,
+          "",
+        ];
+      }),
       "── Summary ──────────────────────────────",
       `Total Panels       : ${calc.totalPanels}`,
       `Total Panel Area   : ${calc.totalArea.toFixed(2)} ${au}`,
@@ -86,12 +98,9 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                 <tr><td>Project Type</td><td>{structName}</td></tr>
                 <tr><td>Dimensions (L × W × H)</td><td>{displayL}{du} × {displayW}{du} × {displayH}{du}</td></tr>
                 <tr><td>Number of Floors</td><td><strong>{floorCount}</strong></td></tr>
-                <tr><td>Floor Area (per floor)</td><td>{(config.length * config.width).toFixed(2)} m²</td></tr>
-                <tr><td>Total Floor Area</td><td>{(config.length * config.width * floorCount).toFixed(2)} m²</td></tr>
-                <tr><td>Roof Panels</td><td>{config.showRoof ? "Included" : "Not included"}</td></tr>
-                <tr><td>Roof Type</td><td>{config.showRoof ? (ROOF_TYPE_OPTIONS?.find(r => r.value === config.roofType)?.label || config.roofType || "Sandwich Panel") : "N/A"}</td></tr>
-                <tr><td>Roof Thickness</td><td>{config.showRoof ? (config.roofThickness || 100) + " mm" : "N/A"}</td></tr>
-                <tr><td>Roof Panel Width</td><td>{config.showRoof ? (config.roofWidth || 1150) + " mm" : "N/A"}</td></tr>
+                <tr><td>Floor Area (per floor)</td><td>{getAreaInUnit(config.length * config.width, unit).toFixed(2)} {au}</td></tr>
+                <tr><td>Total Floor Area</td><td>{getAreaInUnit(config.length * config.width * floorCount, unit).toFixed(2)} {au}</td></tr>
+                <tr><td>Roof Panels</td><td>{config.showRoof ? "Included (see per-floor details)" : "Not included"}</td></tr>
                 <tr><td>Panel Type</td><td>{config.panelType || "both"}</td></tr>
               </tbody>
             </table>
@@ -151,6 +160,13 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                     <tr><td style={{ width: "140px" }}>Wall Color</td><td><span className="color-dot" style={{ background: fr.panelColor }} /> {colorName}</td></tr>
                     <tr><td>Wall Thickness</td><td>{fr.wallThickness} mm</td></tr>
                     <tr><td>Panel Width</td><td>{fr.panelWidthMM || 1200} mm</td></tr>
+                    {fr.roofArea > 0 && fr.floorRoofType && (
+                      <>
+                        <tr><td>Roof Type</td><td>{ROOF_TYPE_OPTIONS?.find(r => r.value === fr.floorRoofType)?.label || fr.floorRoofType}</td></tr>
+                        <tr><td>Roof Thickness</td><td>{fr.floorRoofThickness || 100} mm</td></tr>
+                        <tr><td>Roof Panel Width</td><td>{fr.floorRoofWidth || 1150} mm</td></tr>
+                      </>
+                    )}
                     <tr><td>Est. Weight (this floor)</td><td>{fr.floorWeight.toFixed(0)} kg</td></tr>
                   </tbody>
                 </table>
