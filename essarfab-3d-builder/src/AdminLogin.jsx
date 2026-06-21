@@ -3,13 +3,12 @@ import { useNavigate } from "react-router-dom";
 
 const VALID_EMAIL = "info@essarfabgreenindia.com";
 const VALID_PASSWORD = "green@208006";
-const STORAGE_KEY = "allowedUsers";
+const VALID_ADMIN_ID = "essarfab100cr";
 
-export default function Login({ onLogin }) {
+export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [userId, setUserId] = useState("");
-  const [username, setUsername] = useState("");
+  const [adminId, setAdminId] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
@@ -17,44 +16,28 @@ export default function Login({ onLogin }) {
     e.preventDefault();
     setError("");
 
-    if (email !== VALID_EMAIL || password !== VALID_PASSWORD) {
-      setError("Invalid email or password. Please try again.");
+    if (email !== VALID_EMAIL || password !== VALID_PASSWORD || adminId !== VALID_ADMIN_ID) {
+      setError("Invalid admin credentials. Please try again.");
       return;
     }
 
-    const allowedUsers = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    const user = allowedUsers.find(u => u.userId === userId.trim());
-    
-    if (!user) {
-      setError("sorry bhai!😂. User ID not found.");
-      return;
-    }
-
-    if (user.username !== username.trim()) {
-      setError("sorry bhai!😂. Username does not match.");
-      return;
-    }
-
-    localStorage.setItem("isAuthenticated", "true");
-    localStorage.setItem("currentUser", JSON.stringify(user));
-    onLogin();
+    localStorage.setItem("isAdminAuthenticated", "true");
+    navigate("/admin-dashboard");
   };
 
   return (
     <div className="login-page">
-      <button className="admin-panel-btn" onClick={() => navigate("/admin-login")}>Admin Panel</button>
-
       <div className="login-brand">
         <div className="login-logo">
           <img src="/Essarfab%20logo.png" alt="ESSARFAB GREEN INDIA" />
         </div>
         <h1 className="login-brand-name">ESSARFAB GREEN INDIA</h1>
-        <p className="login-brand-tagline">PUF Panel Calculator & 3D Builder</p>
+        <p className="login-brand-tagline">Admin Panel Access</p>
       </div>
 
       <form className="login-form" onSubmit={handleSubmit}>
-        <h2>Welcome Back</h2>
-        <p className="login-subtitle">Sign in to access the 3D Builder</p>
+        <h2>Admin Login</h2>
+        <p className="login-subtitle">Enter admin credentials to manage users</p>
 
         {error && <div className="login-error-box"><span className="login-error-icon">⚠️</span> {error}</div>}
 
@@ -81,33 +64,22 @@ export default function Login({ onLogin }) {
         </label>
 
         <label>
-          <span className="label-text">User ID</span>
+          <span className="label-text">Admin User ID</span>
           <input
             type="text"
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            placeholder="Enter your user ID"
-            required
-          />
-        </label>
-
-        <label>
-          <span className="label-text">Username</span>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Enter your username"
+            value={adminId}
+            onChange={(e) => setAdminId(e.target.value)}
+            placeholder="Enter admin user ID"
             required
           />
         </label>
 
         <button type="submit" className="btn btn-primary full-width login-btn">
-          <i className="fas fa-sign-in-alt"></i> Sign In
+          <i className="fas fa-shield-alt"></i> Admin Sign In
         </button>
 
         <p className="login-hint">
-          Authorized personnel only. Contact <a href="mailto:info@essarfabgreenindia.com">admin</a> for access.
+          <a href="/login">← Back to User Login</a>
         </p>
       </form>
 

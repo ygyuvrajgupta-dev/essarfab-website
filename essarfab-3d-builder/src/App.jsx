@@ -9,6 +9,8 @@ import Window from "./components/Window";
 import FloorSlab from "./components/FloorSlab";
 import QuoteModal from "./components/QuoteModal";
 import Login from "./Login";
+import AdminLogin from "./AdminLogin";
+import AdminDashboard from "./AdminDashboard";
 import ProtectedRoute from "./ProtectedRoute";
 import DeviceHistory from "./DeviceHistory";
 import {
@@ -903,16 +905,16 @@ export default function App() {
   const partitionCount = floors.reduce((s, f) => s + (f.partitions || []).length, 0);
   const roomCount = floors.reduce((s, f) => s + (f.internalRooms || []).length, 0);
 
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
-
   return (
     <Routes>
       <Route path="/login" element={<Login onLogin={handleLogin} />} />
-      <Route path="/" element={<DeviceHistory />} />
-      <Route path="/device-history" element={<DeviceHistory />} />
-      <Route path="/builder" element={
+      <Route path="/admin-login" element={<AdminLogin />} />
+      <Route path="/admin-dashboard" element={<AdminDashboard />} />
+      {isAuthenticated ? (
+        <>
+          <Route path="/" element={<DeviceHistory />} />
+          <Route path="/device-history" element={<DeviceHistory />} />
+          <Route path="/builder" element={
         <ProtectedRoute>
           <div className="app-layout">
             <aside className="sidebar">
@@ -1437,8 +1439,12 @@ export default function App() {
 
             <button className="logout-btn" onClick={handleLogout} title="Logout">Logout</button>
           </div>
-        </ProtectedRoute>
-      } />
+          </ProtectedRoute>
+        } />
+        </>
+      ) : (
+        <Route path="*" element={<Login onLogin={handleLogin} />} />
+      )}
     </Routes>
   );
 }
