@@ -101,6 +101,13 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                 <tr><td>Floor Area (per floor)</td><td>{getAreaInUnit(config.length * config.width, unit).toFixed(2)} {au}</td></tr>
                 <tr><td>Total Floor Area</td><td>{getAreaInUnit(config.length * config.width * floorCount, unit).toFixed(2)} {au}</td></tr>
                 <tr><td>Roof Panels</td><td>{config.showRoof ? "Included (see per-floor details)" : "Not included"}</td></tr>
+                {config.showRoof && (
+                  <>
+                    <tr><td>Roof Type</td><td>{ROOF_TYPE_OPTIONS?.find(r => r.value === config.roofType)?.label || config.roofType || "Sandwich Panel"}</td></tr>
+                    <tr><td>Roof Thickness</td><td>{config.roofThickness || 100} mm</td></tr>
+                    <tr><td>Roof Panel Width</td><td>{config.roofWidth || 1150} mm</td></tr>
+                  </>
+                )}
                 <tr><td>Panel Type</td><td>{config.panelType || "both"}</td></tr>
               </tbody>
             </table>

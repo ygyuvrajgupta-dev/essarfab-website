@@ -491,7 +491,7 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
     const wallT = (floor.wallThickness || 100) / 1000;
     const roofT = 100 / 1000;
 
-    const partitionLayouts = getPartitionLayouts(floor.partitions || [], length, width, floorH);
+    const partitionLayouts = getPartitionLayouts(floor.partitions || [], length, width, floorH, unit);
     const partitionMap = Object.fromEntries(
       partitionLayouts.map(p => [`floor${fi}_partition_${p.index}`, p])
     );

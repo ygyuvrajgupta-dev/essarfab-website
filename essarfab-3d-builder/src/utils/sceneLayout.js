@@ -8,6 +8,11 @@ export function layoutAlongWall(items, span) {
   }));
 }
 
+const FT_PER_M = 3.28084;
+const M_PER_FT = 0.3048;
+
+function toM(val, unit) { return unit === "ft" ? val * M_PER_FT : val; }
+
 /**
  * Partition positions inside the room.
  * Each partition has: positionX, positionZ, rotationDeg (0-360 degrees).
@@ -15,17 +20,17 @@ export function layoutAlongWall(items, span) {
  *
  * Position is clamped so the ENTIRE partition wall stays inside the building footprint.
  */
-export function getPartitionLayouts(partitions, length, width, height) {
+export function getPartitionLayouts(partitions, length, width, height, unit) {
   if (!partitions.length) return [];
 
   return partitions.map((p, i) => {
-    const posX = p.positionX !== undefined && p.positionX !== "" ? parseFloat(p.positionX) : null;
-    const posZ = p.positionZ !== undefined && p.positionZ !== "" ? parseFloat(p.positionZ) : null;
+    const posX = p.positionX !== undefined && p.positionX !== "" ? toM(parseFloat(p.positionX), unit) : null;
+    const posZ = p.positionZ !== undefined && p.positionZ !== "" ? toM(parseFloat(p.positionZ), unit) : null;
     const rotDeg = parseFloat(p.rotationDeg) || 0;
     const rad = (rotDeg * Math.PI) / 180;
 
-    const wallLen = Math.min(parseFloat(p.length) || length, Math.max(length, width));
-    const wallH = parseFloat(p.height) || height;
+    const wallLen = Math.min(toM(parseFloat(p.length) || length, unit), Math.max(length, width));
+    const wallH = toM(parseFloat(p.height) || height, unit);
 
     // Half-length of the wall
     const halfLen = wallLen / 2;
