@@ -127,12 +127,13 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                 </h4>
                 <table className="quote-table">
                   <thead>
-                    <tr><th>Wall</th><th>Gross {au}</th><th>Net {au}</th><th>Panels</th></tr>
+                    <tr><th>Component</th><th>Thickness</th><th>Gross {au}</th><th>Net {au}</th><th>Panels</th></tr>
                   </thead>
                   <tbody>
                     {fr.wallRows.map(w => (
                       <tr key={w.id}>
                         <td>{w.label.replace(`${fr.label} - `, "")}</td>
+                        <td>{fr.wallThickness} mm</td>
                         <td>{w.grossArea.toFixed(2)}</td>
                         <td>{w.netArea.toFixed(2)}</td>
                         <td><strong>{w.panelCount}</strong></td>
@@ -141,6 +142,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                     {fr.partitionRows.map((p, pi) => (
                       <tr key={`p-${pi}`}>
                         <td style={{ color: "var(--primary-light)" }}>{p.label}</td>
+                        <td>{p.wallThickness || 80} mm</td>
                         <td>{p.grossArea.toFixed(2)}</td>
                         <td>{p.netArea.toFixed(2)}</td>
                         <td><strong>{p.panelCount}</strong></td>

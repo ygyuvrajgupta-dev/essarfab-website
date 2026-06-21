@@ -209,7 +209,9 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       const grossArea = l * h;
       const panelH = (floor.panelHeightMM || 2895.6) / 1000;
       const panelCount = grossArea / (floorPW * panelH);
-      return { label: p.label || `Partition ${pi + 1}`, grossArea, netArea: grossArea, panelCount, deduct: 0, length: l, height: h };
+      const partThickness = p.wallThickness || 80;
+      const partWeight = grossArea * partThickness * 0.012;
+      return { label: p.label || `Partition ${pi + 1}`, grossArea, netArea: grossArea, panelCount, deduct: 0, length: l, height: h, wallThickness: partThickness, weight: partWeight };
     });
 
     const roomRows = (floor.internalRooms || []).map((rm, ri) => {
@@ -274,7 +276,8 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       const wallArea = wallRows.reduce((s, w) => s + w.netArea, 0);
       const partArea = partitionRows.reduce((s, p) => s + p.netArea, 0);
       floorArea += wallArea + partArea;
-      floorWeight += (wallArea + partArea) * wallT * 0.012;
+      floorWeight += wallRows.reduce((s, w) => s + w.netArea * wallT * 0.012, 0);
+      floorWeight += partitionRows.reduce((s, p) => s + (p.weight || 0), 0);
 
       roomRows.forEach(rm => {
         floorPanels += rm.totalPanels;
@@ -800,7 +803,7 @@ export default function App() {
     const defaultH = unit === "ft" ? "13.1" : "4";
     updateFloor(currentFloorId, "partitions", [
       ...currentPartitions,
-      { id: Date.now(), label: `Partition ${currentPartitions.length + 1}`, length: defaultLen, height: defaultH, positionX: "", positionZ: "", rotationDeg: "0", openings: [] },
+      { id: Date.now(), label: `Partition ${currentPartitions.length + 1}`, length: defaultLen, height: defaultH, positionX: "", positionZ: "", rotationDeg: "0", wallThickness: 80, openings: [] },
     ]);
   };
 
@@ -1063,6 +1066,16 @@ export default function App() {
                             </div>
                           </label>
                         </div>
+                        <label>Thickness (mm)
+                          <select value={p.wallThickness || 80} onChange={e => updatePartition(p.id, "wallThickness", Number(e.target.value))}>
+                            <option value={50}>50 mm — Light</option>
+                            <option value={60}>60 mm — Light insulation</option>
+                            <option value={80}>80 mm — Standard</option>
+                            <option value={100}>100 mm — Cold Room</option>
+                            <option value={120}>120 mm — Deep Freeze</option>
+                            <option value={150}>150 mm — Heavy insulation</option>
+                          </select>
+                        </label>
                         <div className="small-section-heading">🚪 Openings in this Partition</div>
                         {(p.openings || []).length === 0 && <div className="empty-hint-sm" style={{margin:"0"}}>No openings. Add a door/window.</div>}
                         {(p.openings || []).map((op, oi) => (
@@ -1369,13 +1382,13 @@ export default function App() {
                               <span style={{marginLeft:"auto",fontSize:"11px",color:"var(--text-muted)"}}>{fr.floorPanels} panels · {(fr.floorArea * areaConv).toFixed(1)} {al}</span>
                             </div>
                             <table className="calc-table">
-                              <thead><tr><th>Component</th><th>Gross {al}</th><th>Net {al}</th><th>Panels</th></tr></thead>
+                              <thead><tr><th>Component</th><th>Thickness</th><th>Gross {al}</th><th>Net {al}</th><th>Panels</th></tr></thead>
                               <tbody>
                                 {fr.wallRows.map(w => (
-                                  <tr key={w.id}><td>{w.label.replace(`${fr.label} - `, "")}</td><td>{(w.grossArea * areaConv).toFixed(1)}</td><td>{(w.netArea * areaConv).toFixed(1)}</td><td><strong>{w.panelCount}</strong></td></tr>
+                                  <tr key={w.id}><td>{w.label.replace(`${fr.label} - `, "")}</td><td>{fr.wallThickness} mm</td><td>{(w.grossArea * areaConv).toFixed(1)}</td><td>{(w.netArea * areaConv).toFixed(1)}</td><td><strong>{w.panelCount}</strong></td></tr>
                                 ))}
                                 {fr.partitionRows.map((p, pi) => (
-                                  <tr key={`p-${pi}`}><td style={{color:"var(--primary-light)"}}>{p.label}</td><td>{(p.grossArea * areaConv).toFixed(1)}</td><td>{(p.netArea * areaConv).toFixed(1)}</td><td><strong>{p.panelCount}</strong></td></tr>
+                                  <tr key={`p-${pi}`}><td style={{color:"var(--primary-light)"}}>{p.label}</td><td>{p.wallThickness || 80} mm</td><td>{(p.grossArea * areaConv).toFixed(1)}</td><td>{(p.netArea * areaConv).toFixed(1)}</td><td><strong>{p.panelCount}</strong></td></tr>
                                 ))}
                                 {(fr.roomRows || []).map((rm, ri) => (
                                   <tr key={`rm-${ri}`}><td style={{color:"var(--accent)"}}>🏠 {rm.label}</td><td>{(rm.totalArea * areaConv).toFixed(1)}</td><td>{(rm.totalArea * areaConv).toFixed(1)}</td><td><strong>{rm.totalPanels}</strong></td></tr>
