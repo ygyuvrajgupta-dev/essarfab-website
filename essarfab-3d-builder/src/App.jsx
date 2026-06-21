@@ -124,13 +124,14 @@ const WALL_OPTIONS = [
 ];
 
 function createDefaultFloor(id, unit, index = 0) {
+  const heightVal = unit === "ft" ? 13.1 : 4;
   return {
     id,
     label: `Floor ${index + 1}`,
-    height: unit === "ft" ? String(13.1) : "4",
+    height: String(heightVal),
     panelColor: "#f5f5f5",
     panelWidthMM: 1200,
-    panelHeightMM: 2895.6,
+    panelHeightMM: Math.round(toM(heightVal, unit) * 1000),
     wallThickness: 100,
     partitions: [],
     internalRooms: [],
@@ -973,7 +974,11 @@ export default function App() {
                             {floors.length > 1 && <button className="remove-btn-sm" onClick={() => removeFloor(f.id)}>✕</button>}
                           </div>
                           <div className="dim-row floor-dim-row">
-                            <label>Height ({displayUnit})<input type="number" min={1} max={unit === "ft" ? 50 : 15} step={0.1} value={f.height} onChange={e => updateFloor(f.id, "height", String(Math.max(1, parseFloat(e.target.value) || 1)))} /></label>
+                            <label>Height ({displayUnit})<input type="number" min={1} max={unit === "ft" ? 50 : 15} step={0.1} value={f.height} onChange={e => {
+                              const newHeight = String(Math.max(1, parseFloat(e.target.value) || 1));
+                              updateFloor(f.id, "height", newHeight);
+                              updateFloor(f.id, "panelHeightMM", Math.round(toM(parseFloat(newHeight), unit) * 1000));
+                            }} /></label>
                             <label className="floor-color-select">Color
                               <div className="floor-color-options">
                                 {COLOR_OPTIONS.map(c => (
@@ -1207,22 +1212,14 @@ export default function App() {
                     <div className="step-title">Step 4: Panel Specifications</div>
                     <p className="step-desc">Configure panel specs for <strong>{currentFloor?.label || "current floor"}</strong>.</p>
 
-                    <label>Standard Panel Width
-                      <select value={currentFloor?.panelWidthMM || 1200} onChange={e => updateFloor(currentFloorId, "panelWidthMM", Number(e.target.value))}>
-                        {PANEL_WIDTH_OPTIONS.map(o => (
-                          <option key={o.value} value={o.value * 1000}>
-                            {o.label}{WALL_THICKNESS_RECOMMENDED_WIDTHS[currentFloor?.wallThickness] === o.value * 1000 ? " ✓" : ""}
-                          </option>
-                        ))}
-                      </select>
+                    <label>Panel Width (mm)
+                      <input type="number" min={800} max={2000} step={10} value={currentFloor?.panelWidthMM || 1200} onChange={e => updateFloor(currentFloorId, "panelWidthMM", Number(e.target.value))} />
+                      <span style={{fontSize:"10px",color:"var(--text-muted)",marginTop:"2px",display:"block"}}>Standard: 1200 mm</span>
                     </label>
 
-                    <label>Standard Panel Height
-                      <select value={currentFloor?.panelHeightMM || 2895.6} onChange={e => updateFloor(currentFloorId, "panelHeightMM", Number(e.target.value))}>
-                        {STANDARD_PANEL_HEIGHTS_MM.map(h => (
-                          <option key={h} value={h}>{STANDARD_PANEL_HEIGHTS_LABELS[h] || `${h} mm`}</option>
-                        ))}
-                      </select>
+                    <label>Panel Height ({displayUnit})
+                      <span className="panel-height-display">{fmt(toM(parseFloat(currentFloor?.height) || 4, unit), unit, 2)} {displayUnit}</span>
+                      <span style={{fontSize:"10px",color:"var(--text-muted)",marginTop:"2px",display:"block"}}>Auto-set from floor height</span>
                     </label>
 
                     <div className="field">

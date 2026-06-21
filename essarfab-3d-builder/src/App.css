@@ -1863,3 +1863,17 @@ select option { background: #1a3524; color: #fff; }
   min-width: 36px;
   text-align: right;
 }
+
+/* ── Panel Height Display ──────────────────────────────────── */
+.panel-height-display {
+  display: block;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--accent);
+  padding: 8px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+  letter-spacing: 0.3px;
+}
