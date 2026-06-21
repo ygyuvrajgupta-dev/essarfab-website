@@ -51,7 +51,6 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
         return [
           `  ${fr.label || `Floor ${fi + 1}`}:`,
           `    Wall Panels:    ${fr.floorPanels} panels · ${fr.floorArea.toFixed(2)} ${au}`,
-          `    Est. Weight:    ${fr.floorWeight.toFixed(0)} kg`,
           `    Wall Color:     ${COLOR_OPTIONS?.find(c => c.hex === fr.panelColor)?.name || fr.panelColor}`,
           `    Wall Thickness: ${fr.wallThickness} mm`,
           ...roofLines,
@@ -61,7 +60,6 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
       "── Summary ──────────────────────────────",
       `Total Panels       : ${calc.totalPanels}`,
       `Total Panel Area   : ${calc.totalArea.toFixed(2)} ${au}`,
-      `Estimated Weight   : ${calc.totalWeight.toFixed(0)} kg`,
       `Number of Floors   : ${floorCount}`,
       "",
       "════════════════════════════════════════",
@@ -176,7 +174,6 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                         <tr><td>Roof Panel Width</td><td>{fr.floorRoofWidth || 1150} mm</td></tr>
                       </>
                     )}
-                    <tr><td>Est. Weight (this floor)</td><td>{fr.floorWeight.toFixed(0)} kg</td></tr>
                   </tbody>
                 </table>
               </section>
@@ -190,7 +187,6 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
               <tbody>
                 <tr><td>Total PUF Panels Required</td><td><strong style={{ color: "var(--accent)", fontSize: "16px" }}>{calc.totalPanels} panels</strong></td></tr>
                 <tr><td>Total Panel Area</td><td><strong>{calc.totalArea.toFixed(2)} {au}</strong></td></tr>
-                <tr><td>Total Estimated Weight</td><td><strong>{calc.totalWeight.toFixed(0)} kg</strong></td></tr>
                 <tr><td>Number of Floors</td><td>{floorCount}</td></tr>
               </tbody>
             </table>

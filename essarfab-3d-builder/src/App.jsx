@@ -179,7 +179,6 @@ function createDefaultRoom(id, unit) {
 function calculate({ length, width, floors, panelType, showRoof, roofType, roofThickness, roofWidth, unit }) {
   let totalPanels = 0;
   let totalArea = 0;
-  let totalWeight = 0;
   const floorResults = [];
   let cumulativeHeight = 0;
 
@@ -210,8 +209,7 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       const panelH = (floor.panelHeightMM || 2895.6) / 1000;
       const panelCount = parseFloat((grossArea / (floorPW * panelH)).toFixed(3));
       const partThickness = p.wallThickness || 80;
-      const partWeight = grossArea * partThickness * 0.012;
-      return { label: p.label || `Partition ${pi + 1}`, grossArea, netArea: grossArea, panelCount, deduct: 0, length: l, height: h, wallThickness: partThickness, weight: partWeight };
+      return { label: p.label || `Partition ${pi + 1}`, grossArea, netArea: grossArea, panelCount, deduct: 0, length: l, height: h, wallThickness: partThickness };
     });
 
     const roomRows = (floor.internalRooms || []).map((rm, ri) => {
@@ -258,7 +256,6 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
         ceilingArea,
         totalPanels: roomWallPanels + ceilingPanels,
         totalArea: roomWallArea + ceilingArea,
-        weight: (roomWallArea + ceilingArea) * rT * 0.012,
         wallThickness: rT,
         panelColor: rm.panelColor,
         panelWidthMM: rm.panelWidthMM,
@@ -268,7 +265,6 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
 
     let floorPanels = 0;
     let floorArea = 0;
-    let floorWeight = 0;
 
     if (panelType === "wall" || panelType === "both") {
       floorPanels += wallRows.reduce((s, w) => s + w.panelCount, 0);
@@ -276,13 +272,10 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       const wallArea = wallRows.reduce((s, w) => s + w.netArea, 0);
       const partArea = partitionRows.reduce((s, p) => s + p.netArea, 0);
       floorArea += wallArea + partArea;
-      floorWeight += wallRows.reduce((s, w) => s + w.netArea * wallT * 0.012, 0);
-      floorWeight += partitionRows.reduce((s, p) => s + (p.weight || 0), 0);
 
       roomRows.forEach(rm => {
         floorPanels += rm.totalPanels;
         floorArea += rm.totalArea;
-        floorWeight += rm.weight;
       });
     }
 
@@ -304,7 +297,6 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       roofPanelCount = parseFloat((roofArea / singleRoofPanelArea).toFixed(3));
       floorPanels += roofPanelCount;
       floorArea += roofArea;
-      floorWeight += roofArea * (floorRoofThickness || 100) * 0.012;
     }
 
     let slabArea = 0;
@@ -321,12 +313,10 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       slabPanelCount = parseFloat((slabArea / singleSlabPanelArea).toFixed(3));
       floorPanels += slabPanelCount;
       floorArea += slabArea;
-      floorWeight += slabArea * floorSlabThickness * 0.012;
     }
 
     totalPanels += floorPanels;
     totalArea += floorArea;
-    totalWeight += floorWeight;
 
     floorResults.push({
       label: floorLabel,
@@ -341,7 +331,6 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       floorSlabThickness,
       floorPanels,
       floorArea,
-      floorWeight,
       panelColor: floor.panelColor,
       panelWidthMM: floor.panelWidthMM,
       wallThickness: wallT,
@@ -356,7 +345,6 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
   return {
     totalPanels,
     totalArea,
-    totalWeight,
     totalHeight: cumulativeHeight,
     floorResults,
   };
@@ -1336,7 +1324,6 @@ export default function App() {
                     <div className="results-summary-grid">
                       <div className="result-stat accent"><span className="rs-val">{calc.totalPanels.toFixed(3)}</span><span className="rs-label">Total Panels</span></div>
                       <div className="result-stat"><span className="rs-val">{fmt(calc.totalArea, resultsUnit === "ft" ? "ft" : "m", 1)}</span><span className="rs-label">Total Area ({resultsUnit === "ft" ? "sq. ft" : "m²"})</span></div>
-                      <div className="result-stat"><span className="rs-val">{calc.totalWeight.toFixed(0)}</span><span className="rs-label">Est. Weight (kg)</span></div>
                       <div className="result-stat"><span className="rs-val">{floors.length}</span><span className="rs-label">Floors</span></div>
                     </div>
 
