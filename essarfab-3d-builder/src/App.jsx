@@ -656,11 +656,11 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
 }
 
 // ─── Step Indicator ──────────────────────────────────────────────────────────
-function StepIndicator({ current }) {
+function StepIndicator({ current, onStepClick }) {
   return (
     <div className="step-indicator">
       {STEPS.map(s => (
-        <div key={s.id} className={`step-dot ${current === s.id ? "active" : current > s.id ? "done" : ""}`}>
+        <div key={s.id} className={`step-dot ${current === s.id ? "active" : current > s.id ? "done" : ""}`} onClick={() => onStepClick && onStepClick(s.id)}>
           <span className="dot">{current > s.id ? "✓" : s.id}</span>
           <span className="step-label">{s.label}</span>
         </div>
@@ -923,7 +923,7 @@ export default function App() {
                   <a className="back-link" href="../../index.html">← Back to Website</a>
                 </div>
 
-                <StepIndicator current={step} />
+                <StepIndicator current={step} onStepClick={setStep} />
 
                 {step === 1 && (
                   <div className="step-content">

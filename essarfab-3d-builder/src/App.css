@@ -894,7 +894,14 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', system-u
   flex: 1;
   min-width: 0;
   position: relative;
-  cursor: default;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.step-dot:hover {
+  transform: scale(1.05);
+}
+.step-dot:active {
+  transform: scale(0.95);
 }
 
 /* connector line */
