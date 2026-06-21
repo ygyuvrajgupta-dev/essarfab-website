@@ -199,7 +199,7 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
     const wallRows = walls.map(w => {
       const grossArea = w.wallLen * w.wallH;
       const panelH = (floor.panelHeightMM || 2895.6) / 1000;
-      const panelCount = grossArea / (floorPW * panelH);
+      const panelCount = parseFloat((grossArea / (floorPW * panelH)).toFixed(3));
       return { ...w, grossArea, openingDeduction: 0, netArea: grossArea, panelCount };
     });
 
@@ -208,7 +208,7 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       const h = toM(parseFloat(p.height) || floorHeightM, unit);
       const grossArea = l * h;
       const panelH = (floor.panelHeightMM || 2895.6) / 1000;
-      const panelCount = grossArea / (floorPW * panelH);
+      const panelCount = parseFloat((grossArea / (floorPW * panelH)).toFixed(3));
       const partThickness = p.wallThickness || 80;
       const partWeight = grossArea * partThickness * 0.012;
       return { label: p.label || `Partition ${pi + 1}`, grossArea, netArea: grossArea, panelCount, deduct: 0, length: l, height: h, wallThickness: partThickness, weight: partWeight };
@@ -234,7 +234,7 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       const rWallRows = activeWalls.map(w => {
         const grossArea = w.wallLen * w.wallH;
         const rPanelH = (rm.panelHeightMM || 2895.6) / 1000;
-        const pCount = grossArea / (rPW * rPanelH);
+        const pCount = parseFloat((grossArea / (rPW * rPanelH)).toFixed(3));
         return { ...w, grossArea, openingDeduction: 0, netArea: grossArea, panelCount: pCount };
       });
 
@@ -246,7 +246,7 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       if (rm.showCeiling) {
         ceilingArea = rl * rw;
         const rCeilPanelH = (rm.panelHeightMM || 2895.6) / 1000;
-        ceilingPanels = ceilingArea / (rPW * rCeilPanelH);
+        ceilingPanels = parseFloat((ceilingArea / (rPW * rCeilPanelH)).toFixed(3));
       }
 
       return {
@@ -1334,7 +1334,7 @@ export default function App() {
                     </div>
 
                     <div className="results-summary-grid">
-                      <div className="result-stat accent"><span className="rs-val">{calc.totalPanels}</span><span className="rs-label">Total Panels</span></div>
+                      <div className="result-stat accent"><span className="rs-val">{calc.totalPanels.toFixed(3)}</span><span className="rs-label">Total Panels</span></div>
                       <div className="result-stat"><span className="rs-val">{fmt(calc.totalArea, resultsUnit === "ft" ? "ft" : "m", 1)}</span><span className="rs-label">Total Area ({resultsUnit === "ft" ? "sq. ft" : "m²"})</span></div>
                       <div className="result-stat"><span className="rs-val">{calc.totalWeight.toFixed(0)}</span><span className="rs-label">Est. Weight (kg)</span></div>
                       <div className="result-stat"><span className="rs-val">{floors.length}</span><span className="rs-label">Floors</span></div>
@@ -1379,25 +1379,25 @@ export default function App() {
                             <div className="floor-result-header">
                               <span className="floor-color-dot" style={{background: fr.panelColor}} />
                               <strong>{fr.label}</strong>
-                              <span style={{marginLeft:"auto",fontSize:"11px",color:"var(--text-muted)"}}>{fr.floorPanels} panels · {(fr.floorArea * areaConv).toFixed(1)} {al}</span>
+                              <span style={{marginLeft:"auto",fontSize:"11px",color:"var(--text-muted)"}}>{fr.floorPanels.toFixed(3)} panels · {(fr.floorArea * areaConv).toFixed(1)} {al}</span>
                             </div>
                             <table className="calc-table">
                               <thead><tr><th>Component</th><th>Thickness</th><th>Gross {al}</th><th>Net {al}</th><th>Panels</th></tr></thead>
                               <tbody>
                                 {fr.wallRows.map(w => (
-                                  <tr key={w.id}><td>{w.label.replace(`${fr.label} - `, "")}</td><td>{fr.wallThickness} mm</td><td>{(w.grossArea * areaConv).toFixed(1)}</td><td>{(w.netArea * areaConv).toFixed(1)}</td><td><strong>{w.panelCount}</strong></td></tr>
+                                  <tr key={w.id}><td>{w.label.replace(`${fr.label} - `, "")}</td><td>{fr.wallThickness} mm</td><td>{(w.grossArea * areaConv).toFixed(1)}</td><td>{(w.netArea * areaConv).toFixed(1)}</td><td><strong>{w.panelCount.toFixed(3)}</strong></td></tr>
                                 ))}
                                 {fr.partitionRows.map((p, pi) => (
-                                  <tr key={`p-${pi}`}><td style={{color:"var(--primary-light)"}}>{p.label}</td><td>{p.wallThickness || 80} mm</td><td>{(p.grossArea * areaConv).toFixed(1)}</td><td>{(p.netArea * areaConv).toFixed(1)}</td><td><strong>{p.panelCount}</strong></td></tr>
+                                  <tr key={`p-${pi}`}><td style={{color:"var(--primary-light)"}}>{p.label}</td><td>{p.wallThickness || 80} mm</td><td>{(p.grossArea * areaConv).toFixed(1)}</td><td>{(p.netArea * areaConv).toFixed(1)}</td><td><strong>{p.panelCount.toFixed(3)}</strong></td></tr>
                                 ))}
                                 {(fr.roomRows || []).map((rm, ri) => (
-                                  <tr key={`rm-${ri}`}><td style={{color:"var(--accent)"}}>🏠 {rm.label}</td><td>{(rm.totalArea * areaConv).toFixed(1)}</td><td>{(rm.totalArea * areaConv).toFixed(1)}</td><td><strong>{rm.totalPanels}</strong></td></tr>
+                                  <tr key={`rm-${ri}`}><td style={{color:"var(--accent)"}}>🏠 {rm.label}</td><td>{(rm.totalArea * areaConv).toFixed(1)}</td><td>{(rm.totalArea * areaConv).toFixed(1)}</td><td><strong>{rm.totalPanels.toFixed(3)}</strong></td></tr>
                                 ))}
                                 {fr.slabArea > 0 && (
-                                  <tr><td style={{color:"var(--accent)"}}>🔲 Floor Slab</td><td>{(fr.slabArea * areaConv).toFixed(1)}</td><td>{(fr.slabArea * areaConv).toFixed(1)}</td><td><strong>{fr.slabPanelCount}</strong></td></tr>
+                                  <tr><td style={{color:"var(--accent)"}}>🔲 Floor Slab</td><td>{(fr.slabArea * areaConv).toFixed(1)}</td><td>{(fr.slabArea * areaConv).toFixed(1)}</td><td><strong>{fr.slabPanelCount.toFixed(3)}</strong></td></tr>
                                 )}
                                 {fr.roofArea > 0 && (
-                                  <tr><td style={{color:"var(--accent)"}}>🟠 Roof{fr.floorRoofType ? ` (${ROOF_TYPE_OPTIONS.find(r => r.value === fr.floorRoofType)?.label?.replace(/\(\d+ mm\)/, `(${fr.floorRoofThickness} mm)`) || fr.floorRoofType})` : ""}</td><td>{(fr.roofArea * areaConv).toFixed(1)}</td><td>{(fr.roofArea * areaConv).toFixed(1)}</td><td><strong>{fr.roofPanelCount}</strong></td></tr>
+                                  <tr><td style={{color:"var(--accent)"}}>🟠 Roof{fr.floorRoofType ? ` (${ROOF_TYPE_OPTIONS.find(r => r.value === fr.floorRoofType)?.label?.replace(/\(\d+ mm\)/, `(${fr.floorRoofThickness} mm)`) || fr.floorRoofType})` : ""}</td><td>{(fr.roofArea * areaConv).toFixed(1)}</td><td>{(fr.roofArea * areaConv).toFixed(1)}</td><td><strong>{fr.roofPanelCount.toFixed(3)}</strong></td></tr>
                                 )}
                               </tbody>
                             </table>
