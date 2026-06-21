@@ -309,7 +309,9 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       floorRoofWidth = floor.roofWidth || roofWidth;
       roofArea = length * width;
       const roofPW = (floorRoofWidth || 1150) / 1000;
-      roofPanelCount = Math.ceil(length / roofPW) * Math.ceil(width / roofPW);
+      const roofPanelH = (floor.panelHeightMM || 2895.6) / 1000;
+      const singleRoofPanelArea = roofPW * roofPanelH;
+      roofPanelCount = parseFloat((roofArea / singleRoofPanelArea).toFixed(3));
       floorPanels += roofPanelCount;
       floorArea += roofArea;
       floorWeight += roofArea * (floorRoofThickness || 100) * 0.012;
