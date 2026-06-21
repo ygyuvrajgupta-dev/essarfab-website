@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } catch (err) {
         console.error('Form error:', err);
-        alert('Something went wrong. Please try again or call us directly at +91-98387 00617.');
+        alert('Something went wrong. Please try again or call us directly at +91-96286 65656.');
 
         // Restore button
         if (btnText && btnLoading) {

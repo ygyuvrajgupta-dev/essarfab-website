@@ -146,6 +146,7 @@ function createDefaultFloor(id, unit, index = 0) {
     roofThickness: 100,
     roofWidth: 1150,
     showFloorRoof: false,
+    showFloorSlab: false,
   };
 }
 
@@ -196,29 +197,18 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
 
     const wallRows = walls.map(w => {
       const grossArea = w.wallLen * w.wallH;
-      const openingDeduction = (floor.openings || [])
-        .filter(o => o.wall === w.id.replace(`floor${fi}_`, ""))
-        .reduce((sum, o) => sum + (parseFloat(o.width) || 0) * (parseFloat(o.height) || 0), 0);
-      const netArea = Math.max(0, grossArea - openingDeduction);
       const panelH = (floor.panelHeightMM || 2895.6) / 1000;
-      const panelCount = netArea / (floorPW * panelH);
-      return { ...w, grossArea, openingDeduction, netArea, panelCount };
+      const panelCount = grossArea / (floorPW * panelH);
+      return { ...w, grossArea, openingDeduction: 0, netArea: grossArea, panelCount };
     });
 
     const partitionRows = (floor.partitions || []).map((p, pi) => {
       const l = toM(parseFloat(p.length) || 0, unit);
       const h = toM(parseFloat(p.height) || floorHeightM, unit);
-      let deduct = (floor.openings || [])
-        .filter(o => o.wall === `floor${fi}_partition_${pi}`)
-        .reduce((sum, o) => sum + (parseFloat(o.width) || 0) * (parseFloat(o.height) || 0), 0);
-      if (p.openings && p.openings.length) {
-        deduct += p.openings.reduce((sum, o) => sum + (parseFloat(o.width) || 0) * (parseFloat(o.height) || 0), 0);
-      }
       const grossArea = l * h;
-      const netArea = Math.max(0, grossArea - deduct);
       const panelH = (floor.panelHeightMM || 2895.6) / 1000;
-      const panelCount = netArea / (floorPW * panelH);
-      return { label: p.label || `Partition ${pi + 1}`, grossArea, netArea, panelCount, deduct, length: l, height: h };
+      const panelCount = grossArea / (floorPW * panelH);
+      return { label: p.label || `Partition ${pi + 1}`, grossArea, netArea: grossArea, panelCount, deduct: 0, length: l, height: h };
     });
 
     const roomRows = (floor.internalRooms || []).map((rm, ri) => {
@@ -240,13 +230,9 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
 
       const rWallRows = activeWalls.map(w => {
         const grossArea = w.wallLen * w.wallH;
-        const openingDeduction = (rm.openings || [])
-          .filter(o => o.wall === w.id.replace(`room${ri}_`, ""))
-          .reduce((sum, o) => sum + (parseFloat(o.width) || 0) * (parseFloat(o.height) || 0), 0);
-        const netArea = Math.max(0, grossArea - openingDeduction);
         const rPanelH = (rm.panelHeightMM || 2895.6) / 1000;
-        const pCount = netArea / (rPW * rPanelH);
-        return { ...w, grossArea, openingDeduction, netArea, panelCount: pCount };
+        const pCount = grossArea / (rPW * rPanelH);
+        return { ...w, grossArea, openingDeduction: 0, netArea: grossArea, panelCount: pCount };
       });
 
       const roomWallPanels = rWallRows.reduce((s, w) => s + w.panelCount, 0);
@@ -317,6 +303,23 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       floorWeight += roofArea * (floorRoofThickness || 100) * 0.012;
     }
 
+    let slabArea = 0;
+    let slabPanelCount = 0;
+    let floorSlabThickness = null;
+
+    const hasFloorSlab = floor.showFloorSlab && (panelType === "wall" || panelType === "both");
+    if (hasFloorSlab) {
+      floorSlabThickness = floor.wallThickness || 100;
+      slabArea = length * width;
+      const slabPW = (floor.panelWidthMM || 1200) / 1000;
+      const slabPanelH = (floor.panelHeightMM || 2895.6) / 1000;
+      const singleSlabPanelArea = slabPW * slabPanelH;
+      slabPanelCount = parseFloat((slabArea / singleSlabPanelArea).toFixed(3));
+      floorPanels += slabPanelCount;
+      floorArea += slabArea;
+      floorWeight += slabArea * floorSlabThickness * 0.012;
+    }
+
     totalPanels += floorPanels;
     totalArea += floorArea;
     totalWeight += floorWeight;
@@ -329,6 +332,9 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       roomRows,
       roofArea,
       roofPanelCount,
+      slabArea,
+      slabPanelCount,
+      floorSlabThickness,
       floorPanels,
       floorArea,
       floorWeight,
@@ -552,9 +558,16 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
             });
           });
 
+          // Cap partition visual height to match room walls when internal rooms exist
+          const maxRoomHeight = (floor.internalRooms || []).reduce((max, r) => {
+            const rh = Math.min(toM(parseFloat(r.roomHeight) || 2.4, unit), floorH);
+            return Math.max(max, rh);
+          }, 0);
+          const effectiveH = (floor.internalRooms || []).length > 0 ? Math.min(wallH, Math.round(maxRoomHeight * 10000) / 10000) : wallH;
+
           return (
             <Fragment key={partition.id ?? index}>
-              <Panel position={[x, yOffset + wallH / 2, z]} rotation={[0, rad, 0]} size={[wallLen, wallH, wallT]} color="#dce8e0" panelWidth={pw} />
+              <Panel position={[x, yOffset + effectiveH / 2, z]} rotation={[0, rad, 0]} size={[wallLen, effectiveH, wallT]} color="#dce8e0" panelWidth={pw} />
               {placedPartOpenings.map(({ opening, position, rotation, width: w, height: h }, oi) =>
                 opening.type === "door" ? (
                   <Door key={opening.id ?? `pd-${index}-${oi}`} position={position} rotation={rotation} doorWidth={w} doorHeight={h} color="#dce8e0" thickness={wallT} />
@@ -577,6 +590,11 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
         {showRoofPanel && (
           <Panel position={[0, yOffset + floorH + roofT / 2, 0]} rotation={[Math.PI / 2, 0, 0]}
             size={[length, width, roofT]} color={color} panelWidth={pw} />
+        )}
+
+        {floor.showFloorSlab && (panelType === "wall" || panelType === "both") && (
+          <Panel position={[0, yOffset - wallT / 2, 0]} rotation={[Math.PI / 2, 0, 0]}
+            size={[length, width, wallT]} color={color} panelWidth={pw} />
         )}
 
         {showWalls && [[-length/2, width/2], [length/2, width/2], [-length/2, -width/2], [length/2, -width/2]]
@@ -968,6 +986,10 @@ export default function App() {
                             <input type="checkbox" checked={!!f.showFloorRoof} onChange={e => updateFloor(f.id, "showFloorRoof", e.target.checked)} />
                             Include Roof/Ceiling for this floor
                           </label>
+                          <label className="toggle-label" style={{fontSize:"11px",marginTop:"2px"}}>
+                            <input type="checkbox" checked={!!f.showFloorSlab} onChange={e => updateFloor(f.id, "showFloorSlab", e.target.checked)} />
+                            Include PUF Floor Slab (ground floor)
+                          </label>
                           {f.showFloorRoof && showRoof && (
                             <div className="dim-row two-col" style={{marginTop:"4px",gap:"6px"}}>
                               <label style={{fontSize:"10px"}}>Roof Type
@@ -1321,6 +1343,7 @@ export default function App() {
                         const wallArea = fr.wallRows.reduce((s, w) => s + w.netArea, 0) + fr.partitionRows.reduce((s, p) => s + p.netArea, 0);
                         const roomArea = fr.roomRows.reduce((s, r) => s + r.totalArea, 0);
                         const roofArea = fr.roofArea || 0;
+                        const slabArea = fr.slabArea || 0;
                         const ru = resultsUnit;
                         const areaConv = ru === "ft" ? FT_PER_M * FT_PER_M : 1;
                         const al = ru === "ft" ? "sq. ft" : "m²";
@@ -1329,6 +1352,7 @@ export default function App() {
                             <span className="area-label">{fr.label}</span>
                             <span className="area-value">🧱 Walls: <strong>{(wallArea * areaConv).toFixed(1)} {al}</strong></span>
                             <span className="area-value">🏠 Rooms: <strong>{(roomArea * areaConv).toFixed(1)} {al}</strong></span>
+                            {slabArea > 0 && <span className="area-value">🔲 Floor Slab: <strong>{(slabArea * areaConv).toFixed(1)} {al}</strong></span>}
                             {roofArea > 0 && <span className="area-value">🟠 Roof: <strong>{(roofArea * areaConv).toFixed(1)} {al}</strong></span>}
                           </div>
                         );
@@ -1359,8 +1383,11 @@ export default function App() {
                                 {(fr.roomRows || []).map((rm, ri) => (
                                   <tr key={`rm-${ri}`}><td style={{color:"var(--accent)"}}>🏠 {rm.label}</td><td>{(rm.totalArea * areaConv).toFixed(1)}</td><td>{(rm.totalArea * areaConv).toFixed(1)}</td><td><strong>{rm.totalPanels}</strong></td></tr>
                                 ))}
+                                {fr.slabArea > 0 && (
+                                  <tr><td style={{color:"var(--accent)"}}>🔲 Floor Slab</td><td>{(fr.slabArea * areaConv).toFixed(1)}</td><td>{(fr.slabArea * areaConv).toFixed(1)}</td><td><strong>{fr.slabPanelCount}</strong></td></tr>
+                                )}
                                 {fr.roofArea > 0 && (
-                                  <tr><td style={{color:"var(--accent)"}}>🟠 Roof{fr.floorRoofType ? ` (${ROOF_TYPE_OPTIONS.find(r => r.value === fr.floorRoofType)?.label || fr.floorRoofType})` : ""}</td><td>{(fr.roofArea * areaConv).toFixed(1)}</td><td>{(fr.roofArea * areaConv).toFixed(1)}</td><td><strong>{fr.roofPanelCount}</strong></td></tr>
+                                  <tr><td style={{color:"var(--accent)"}}>🟠 Roof{fr.floorRoofType ? ` (${ROOF_TYPE_OPTIONS.find(r => r.value === fr.floorRoofType)?.label?.replace(/\(\d+ mm\)/, `(${fr.floorRoofThickness} mm)`) || fr.floorRoofType})` : ""}</td><td>{(fr.roofArea * areaConv).toFixed(1)}</td><td>{(fr.roofArea * areaConv).toFixed(1)}</td><td><strong>{fr.roofPanelCount}</strong></td></tr>
                                 )}
                               </tbody>
                             </table>
