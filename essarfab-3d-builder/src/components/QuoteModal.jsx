@@ -176,9 +176,27 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                     <tr className="total-row">
                       <td><strong>Floor Totals</strong></td>
                       <td></td>
-                      <td><strong>{fr.floorArea.toFixed(2)}</strong></td>
-                      <td><strong>{fr.floorArea.toFixed(2)}</strong></td>
-                      <td><strong>{fr.floorPanels.toFixed(3)}</strong></td>
+                      <td><strong>{(
+                        fr.wallRows.reduce((s,w) => s + w.grossArea, 0) +
+                        fr.partitionRows.reduce((s,p) => s + p.grossArea, 0) +
+                        (fr.roomRows || []).reduce((s,r) => s + r.totalArea, 0) +
+                        (fr.roofArea || 0) +
+                        (fr.slabArea || 0)
+                      ).toFixed(2)}</strong></td>
+                      <td><strong>{(
+                        fr.wallRows.reduce((s,w) => s + w.grossArea, 0) +
+                        fr.partitionRows.reduce((s,p) => s + p.grossArea, 0) +
+                        (fr.roomRows || []).reduce((s,r) => s + r.totalArea, 0) +
+                        (fr.roofArea || 0) +
+                        (fr.slabArea || 0)
+                      ).toFixed(2)}</strong></td>
+                      <td><strong>{(
+                        fr.wallRows.reduce((s,w) => s + w.panelCount, 0) +
+                        fr.partitionRows.reduce((s,p) => s + p.panelCount, 0) +
+                        (fr.roomRows || []).reduce((s,r) => s + r.totalPanels, 0) +
+                        (fr.roofPanelCount || 0) +
+                        (fr.slabPanelCount || 0)
+                      ).toFixed(3)}</strong></td>
                     </tr>
                   </tbody>
                 </table>
