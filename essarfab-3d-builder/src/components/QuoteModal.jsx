@@ -46,11 +46,11 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
           `    Roof Type:      ${ROOF_TYPE_OPTIONS?.find(r => r.value === fr.floorRoofType)?.label || fr.floorRoofType}`,
           `    Roof Thickness: ${fr.floorRoofThickness || 100} mm`,
           `    Roof Width:     ${fr.floorRoofWidth || 1150} mm`,
-          `    Roof Panels:    ${fr.roofPanelCount} panels · ${fr.roofArea.toFixed(2)} ${au}`,
+          `    Roof Panels:    ${fr.roofPanelCount.toFixed(3)} panels · ${fr.roofArea.toFixed(2)} ${au}`,
         ] : [];
         return [
           `  ${fr.label || `Floor ${fi + 1}`}:`,
-          `    Wall Panels:    ${fr.floorPanels} panels · ${fr.floorArea.toFixed(2)} ${au}`,
+          `    Wall Panels:    ${fr.floorPanels.toFixed(3)} panels · ${fr.floorArea.toFixed(2)} ${au}`,
           `    Wall Color:     ${COLOR_OPTIONS?.find(c => c.hex === fr.panelColor)?.name || fr.panelColor}`,
           `    Wall Thickness: ${fr.wallThickness} mm`,
           ...roofLines,
@@ -58,7 +58,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
         ];
       }),
       "── Summary ──────────────────────────────",
-      `Total Panels       : ${calc.totalPanels}`,
+      `Total Panels       : ${calc.totalPanels.toFixed(3)}`,
       `Total Panel Area   : ${calc.totalArea.toFixed(2)} ${au}`,
       `Number of Floors   : ${floorCount}`,
       "",
@@ -120,7 +120,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                   <span className="color-dot" style={{ background: fr.panelColor || "#f5f5f5" }} />
                   {fr.label || `Floor ${fi + 1}`}
                   <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--text-muted)", marginLeft: "8px" }}>
-                    {fr.floorPanels} panels · {fr.floorArea.toFixed(2)} {au}
+                    {fr.floorPanels.toFixed(3)} panels · {fr.floorArea.toFixed(2)} {au}
                   </span>
                 </h4>
                 <table className="quote-table">
@@ -134,7 +134,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                         <td>{fr.wallThickness} mm</td>
                         <td>{w.grossArea.toFixed(2)}</td>
                         <td>{w.netArea.toFixed(2)}</td>
-                        <td><strong>{w.panelCount}</strong></td>
+                        <td><strong>{w.panelCount.toFixed(3)}</strong></td>
                       </tr>
                     ))}
                     {fr.partitionRows.map((p, pi) => (
@@ -143,22 +143,42 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                         <td>{p.wallThickness || 80} mm</td>
                         <td>{p.grossArea.toFixed(2)}</td>
                         <td>{p.netArea.toFixed(2)}</td>
-                        <td><strong>{p.panelCount}</strong></td>
+                        <td><strong>{p.panelCount.toFixed(3)}</strong></td>
+                      </tr>
+                    ))}
+                    {(fr.roomRows || []).map((rm, ri) => (
+                      <tr key={`rm-${ri}`}>
+                        <td style={{ color: "var(--accent)" }}>🏠 {rm.label}</td>
+                        <td>{rm.wallThickness || 80} mm</td>
+                        <td>{rm.totalArea.toFixed(2)}</td>
+                        <td>{rm.totalArea.toFixed(2)}</td>
+                        <td><strong>{rm.totalPanels.toFixed(3)}</strong></td>
                       </tr>
                     ))}
                     {fr.roofArea > 0 && (
                       <tr>
                         <td style={{ color: "var(--accent)" }}>🟠 Roof</td>
+                        <td>{fr.floorRoofThickness || 100} mm</td>
                         <td>{fr.roofArea.toFixed(2)}</td>
                         <td>{fr.roofArea.toFixed(2)}</td>
-                        <td><strong>{fr.roofPanelCount}</strong></td>
+                        <td><strong>{fr.roofPanelCount.toFixed(3)}</strong></td>
+                      </tr>
+                    )}
+                    {fr.slabArea > 0 && (
+                      <tr>
+                        <td style={{ color: "var(--accent)" }}>🔲 Floor Slab</td>
+                        <td>{fr.floorSlabThickness || 100} mm</td>
+                        <td>{fr.slabArea.toFixed(2)}</td>
+                        <td>{fr.slabArea.toFixed(2)}</td>
+                        <td><strong>{fr.slabPanelCount.toFixed(3)}</strong></td>
                       </tr>
                     )}
                     <tr className="total-row">
                       <td><strong>Floor Totals</strong></td>
+                      <td></td>
                       <td><strong>{fr.floorArea.toFixed(2)}</strong></td>
                       <td><strong>{fr.floorArea.toFixed(2)}</strong></td>
-                      <td><strong>{fr.floorPanels}</strong></td>
+                      <td><strong>{fr.floorPanels.toFixed(3)}</strong></td>
                     </tr>
                   </tbody>
                 </table>
@@ -185,7 +205,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
             <h4>Final Summary</h4>
             <table className="quote-table">
               <tbody>
-                <tr><td>Total PUF Panels Required</td><td><strong style={{ color: "var(--accent)", fontSize: "16px" }}>{calc.totalPanels} panels</strong></td></tr>
+                <tr><td>Total PUF Panels Required</td><td><strong style={{ color: "var(--accent)", fontSize: "16px" }}>{calc.totalPanels.toFixed(3)} panels</strong></td></tr>
                 <tr><td>Total Panel Area</td><td><strong>{calc.totalArea.toFixed(2)} {au}</strong></td></tr>
                 <tr><td>Number of Floors</td><td>{floorCount}</td></tr>
               </tbody>
@@ -197,7 +217,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
             <div className="contact-icon">📞</div>
             <div>
               <div className="contact-title">Contact ESSARFAB for Pricing & Orders</div>
-              <div className="contact-phone">+91-98387 00617</div>
+              <div className="contact-phone">+91-96286 65656</div>
               <div className="contact-web">WhatsApp: +91-80528 75755 · infoessarfabgreen@gmail.com</div>
               <div className="contact-web">www.essarfabgreenindia.com</div>
             </div>
