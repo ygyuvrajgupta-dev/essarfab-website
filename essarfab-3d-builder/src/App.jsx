@@ -376,10 +376,11 @@ function InternalRoom3D({ room, index, floorHeight, yOffset, unit, length, width
   Object.entries(grouped).forEach(([wallId, wallOpenings]) => {
     const span = wallSpans[wallId] ?? rl;
     layoutAlongWall(wallOpenings, span).forEach(({ item, offset }) => {
-      const doorW = parseFloat(item.width) || 0.9;
-      const doorH = parseFloat(item.height) || 2.0;
+      const doorW = toM(parseFloat(item.width) || 0.9, unit);
+      const doorH = toM(parseFloat(item.height) || 2.0, unit);
       const sill = item.type === "window" ? Math.min(1.0, Math.max(0.6, rh - doorH - 0.3)) : 0;
-      const yPos = item.type === "door" ? doorH / 2 : sill + doorH / 2;
+      // Y at floor level - Door/Window components handle internal centering
+      const yPos = 0;
       const insetVal = wallT / 2 + 0.015;
       let pos, rot;
 
@@ -502,7 +503,7 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
       const span = wallSpans[wallId] ?? length;
       layoutAlongWall(wallOpenings, span).forEach(({ item, offset }) => {
         const layout = partitionMap[`floor${fi}_${wallId}`];
-        const transform = getOpeningTransform(item, layout, { length, width, thickness: wallT, offset });
+        const transform = getOpeningTransform(item, layout, { length, width, thickness: wallT, offset, unit });
         if (transform) {
           placedOpenings.push({
             opening: item,
@@ -536,9 +537,10 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
           Object.entries(groupedPart).forEach(([wallId, wallOpenings]) => {
             const span = wallLen;
             layoutAlongWall(wallOpenings, span).forEach(({ item, offset }) => {
-              const doorW = parseFloat(item.width) || 0.9;
-              const doorH = parseFloat(item.height) || 2.0;
-              const yPos = doorH / 2;
+              const doorW = toM(parseFloat(item.width) || 0.9, unit);
+              const doorH = toM(parseFloat(item.height) || 2.0, unit);
+              // Y at floor level - Door/Window components handle internal centering
+              const yPos = 0;
               const insetV = wallT / 2 + 0.015;
               const worldX = x + offset * Math.cos(rad) + insetV * Math.sin(rad);
               const worldZ = z + offset * Math.sin(rad) + insetV * Math.cos(rad);

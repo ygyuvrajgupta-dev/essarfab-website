@@ -67,11 +67,12 @@ export function getPartitionLayouts(partitions, length, width, height, unit) {
  * Resolve 3D transform for an opening on outer walls or partition walls.
  * Returns { position, rotation } for R3F groups.
  */
-export function getOpeningTransform(opening, layout, { length, width, thickness, offset }) {
-  const doorW = parseFloat(opening.width) || 1.2;
-  const doorH = parseFloat(opening.height) || (opening.type === "door" ? 2.1 : 1.0);
+export function getOpeningTransform(opening, layout, { length, width, thickness, offset, unit }) {
+  const doorW = toM(parseFloat(opening.width) || 1.2, unit);
+  const doorH = toM(parseFloat(opening.height) || (opening.type === "door" ? 2.1 : 1.0), unit);
   const sill = opening.type === "window" ? Math.min(1.0, Math.max(0.6, (layout?.wallH || 4) - doorH - 0.3)) : 0;
-  const y = opening.type === "door" ? doorH / 2 : sill + doorH / 2;
+  // Y is floor-level: Door/Window components handle internal centering
+  const y = 0;
   const inset = thickness / 2 + 0.02;
 
   const wall = opening.wall;

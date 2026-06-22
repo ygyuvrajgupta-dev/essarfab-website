@@ -5,7 +5,7 @@ function Door({ position, rotation = [0, 0, 0], doorWidth = 1.2, doorHeight = 2.
   return (
     <group position={position} rotation={rotation}>
       {/* Door frame — top */}
-      <mesh position={[0, doorHeight / 2 + fw / 2, 0]}>
+      <mesh position={[0, doorHeight - fw / 2, 0]}>
         <boxGeometry args={[doorWidth + fw * 2, fw, fd]} />
         <meshStandardMaterial color="#0b5d3b" metalness={0.5} roughness={0.3} />
       </mesh>
