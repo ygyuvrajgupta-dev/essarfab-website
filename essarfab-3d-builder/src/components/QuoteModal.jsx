@@ -63,7 +63,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
       `Number of Floors   : ${floorCount}`,
       "",
       "════════════════════════════════════════",
-      "Contact: +91-98387 00617",
+      "Contact: +91-96286 65656",
       "WhatsApp: +91-80528 75755",
       "Email: infoessarfabgreen@gmail.com",
       "www.essarfabgreenindia.com",
