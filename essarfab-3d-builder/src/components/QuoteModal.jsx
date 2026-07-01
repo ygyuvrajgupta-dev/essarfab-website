@@ -46,6 +46,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
           `    Roof Type:      ${ROOF_TYPE_OPTIONS?.find(r => r.value === fr.floorRoofType)?.label || fr.floorRoofType}`,
           `    Roof Thickness: ${fr.floorRoofThickness || 100} mm`,
           `    Roof Width:     ${fr.floorRoofWidth || 1150} mm`,
+          `    Roof Panel Ht:  ${((floors?.[fi]?.roofPanelHeightMM || 2895.6) / 1000).toFixed(2)} m (${(floors?.[fi]?.roofPanelHeightMM || 2895.6)} mm)`,
           `    Roof Panels:    ${fr.roofPanelCount.toFixed(3)} panels · ${fr.roofArea.toFixed(2)} ${au}`,
         ] : [];
         return [
@@ -210,6 +211,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                         <tr><td>Roof Type</td><td>{ROOF_TYPE_OPTIONS?.find(r => r.value === fr.floorRoofType)?.label || fr.floorRoofType}</td></tr>
                         <tr><td>Roof Thickness</td><td>{fr.floorRoofThickness || 100} mm</td></tr>
                         <tr><td>Roof Panel Width</td><td>{fr.floorRoofWidth || 1150} mm</td></tr>
+                        <tr><td>Roof Panel Height</td><td>{(floors?.[fi]?.roofPanelHeightMM || 2895.6)} mm ({(+(floors?.[fi]?.roofPanelHeightMM || 2895.6) / 1000).toFixed(2)} m)</td></tr>
                       </>
                     )}
                   </tbody>

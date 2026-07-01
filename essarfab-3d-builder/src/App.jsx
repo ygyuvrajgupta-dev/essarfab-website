@@ -127,6 +127,7 @@ const WALL_OPTIONS = [
 
 function createDefaultFloor(id, unit, index = 0) {
   const heightVal = unit === "ft" ? 13.1 : 4;
+  const roofPanelHeightVal = unit === "ft" ? 9.5 : 2.8956;
   return {
     id,
     label: `Floor ${index + 1}`,
@@ -148,6 +149,7 @@ function createDefaultFloor(id, unit, index = 0) {
     roofType: "sandwich",
     roofThickness: 100,
     roofWidth: 1150,
+    roofPanelHeightMM: Math.round(toM(roofPanelHeightVal, unit) * 1000),
     showFloorRoof: false,
     showFloorSlab: false,
   };
@@ -294,7 +296,7 @@ function calculate({ length, width, floors, panelType, showRoof, roofType, roofT
       floorRoofWidth = floor.roofWidth || roofWidth;
       roofArea = length * width;
       const roofPW = (floorRoofWidth || 1150) / 1000;
-      const roofPanelH = (floor.panelHeightMM || 2895.6) / 1000;
+      const roofPanelH = (floor.roofPanelHeightMM || floor.panelHeightMM || 2895.6) / 1000;
       const singleRoofPanelArea = roofPW * roofPanelH;
       roofPanelCount = parseFloat((roofArea / singleRoofPanelArea).toFixed(3));
       floorPanels += roofPanelCount;
@@ -886,6 +888,7 @@ export default function App() {
           roomHeight: String(fromM(parseFloat(r.roomHeight) || 2.4, newUnit)),
           openings: (r.openings || []).map(o => ({ ...o, width: String(fromM(parseFloat(o.width) || 0, newUnit)), height: String(fromM(parseFloat(o.height) || 0, newUnit)) })),
         })),
+        roofPanelHeightMM: f.roofPanelHeightMM ? Math.round(fromM(parseFloat(f.roofPanelHeightMM) / 1000, newUnit) * 1000) : undefined,
       })));
       return newUnit;
     });
@@ -1010,6 +1013,12 @@ export default function App() {
                                 <select value={f.roofWidth || 1150} onChange={e => updateFloor(f.id, "roofWidth", Number(e.target.value))}>
                                   {(ROOF_WIDTH_OPTIONS[f.roofType || "sandwich"] || [1150]).map(w => <option key={w} value={w}>{w} mm</option>)}
                                 </select>
+                              </label>
+                              <label style={{fontSize:"10px"}}>Panel Height ({displayUnit})
+                                <input type="number" min={0.5} max={20} step={0.01} value={((f.roofPanelHeightMM || 2895.6) / (unit === "ft" ? (1000 / FT_PER_M) : 1000)).toFixed(2)} onChange={e => {
+                                  const valInMM = Number(e.target.value) * (unit === "ft" ? (1000 / FT_PER_M) : 1000);
+                                  updateFloor(f.id, "roofPanelHeightMM", Math.max(500, valInMM || 2895.6));
+                                }} placeholder={unit === "ft" ? "9.50" : "2.90"} />
                               </label>
                             </div>
                           )}
