@@ -1443,6 +1443,7 @@ export default function App() {
               floors={floors}
               unit={unit}
               displayUnit={displayUnit}
+              resultsUnit={resultsUnit}
               COLOR_OPTIONS={COLOR_OPTIONS}
               STRUCTURE_TYPES={STRUCTURE_TYPES}
               ROOF_TYPE_OPTIONS={ROOF_TYPE_OPTIONS}

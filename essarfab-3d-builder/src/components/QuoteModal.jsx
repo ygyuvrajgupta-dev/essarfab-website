@@ -6,7 +6,7 @@ function getAreaInUnit(areaM2, unit) {
   return unit === "ft" ? areaM2 * FT_PER_M * FT_PER_M : areaM2;
 }
 
-function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, COLOR_OPTIONS, STRUCTURE_TYPES, ROOF_TYPE_OPTIONS }) {
+function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, resultsUnit, COLOR_OPTIONS, STRUCTURE_TYPES, ROOF_TYPE_OPTIONS }) {
   useEffect(() => {
     if (open) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "";
@@ -17,7 +17,9 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
 
   const structName = STRUCTURE_TYPES?.find(s => s.value === config.structureType)?.label || config.structureType;
   const du = displayUnit || "m";
-  const au = unit === "m" ? "m²" : "sq. ft";
+  const ru = resultsUnit || unit;
+  const au = ru === "ft" ? "sq. ft" : "m²";
+  const areaConv = ru === "ft" ? FT_PER_M * FT_PER_M : 1;
 
   const displayL = config.displayLength ?? config.length;
   const displayW = config.displayWidth ?? config.width;
@@ -47,11 +49,11 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
           `    Roof Thickness: ${fr.floorRoofThickness || 100} mm`,
           `    Roof Width:     ${fr.floorRoofWidth || 1150} mm`,
           `    Roof Panel Ht:  ${((floors?.[fi]?.roofPanelHeightMM || 2895.6) / 1000).toFixed(2)} m (${(floors?.[fi]?.roofPanelHeightMM || 2895.6)} mm)`,
-          `    Roof Panels:    ${fr.roofPanelCount.toFixed(3)} panels · ${fr.roofArea.toFixed(2)} ${au}`,
+          `    Roof Panels:    ${fr.roofPanelCount.toFixed(3)} panels · ${(fr.roofArea * areaConv).toFixed(2)} ${au}`,
         ] : [];
         return [
           `  ${fr.label || `Floor ${fi + 1}`}:`,
-          `    Wall Panels:    ${fr.floorPanels.toFixed(3)} panels · ${fr.floorArea.toFixed(2)} ${au}`,
+          `    Wall Panels:    ${fr.floorPanels.toFixed(3)} panels · ${(fr.floorArea * areaConv).toFixed(2)} ${au}`,
           `    Wall Color:     ${COLOR_OPTIONS?.find(c => c.hex === fr.panelColor)?.name || fr.panelColor}`,
           `    Wall Thickness: ${fr.wallThickness} mm`,
           ...roofLines,
@@ -60,7 +62,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
       }),
       "── Summary ──────────────────────────────",
       `Total Panels       : ${calc.totalPanels.toFixed(3)}`,
-      `Total Panel Area   : ${calc.totalArea.toFixed(2)} ${au}`,
+      `Total Panel Area   : ${(calc.totalArea * areaConv).toFixed(2)} ${au}`,
       `Number of Floors   : ${floorCount}`,
       "",
       "════════════════════════════════════════",
@@ -121,7 +123,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                   <span className="color-dot" style={{ background: fr.panelColor || "#f5f5f5" }} />
                   {fr.label || `Floor ${fi + 1}`}
                   <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--text-muted)", marginLeft: "8px" }}>
-                    {fr.floorPanels.toFixed(3)} panels · {fr.floorArea.toFixed(2)} {au}
+                    {fr.floorPanels.toFixed(3)} panels · {(fr.floorArea * areaConv).toFixed(2)} {au}
                   </span>
                 </h4>
                 <table className="quote-table">
@@ -133,8 +135,8 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                       <tr key={w.id}>
                         <td>{w.label.replace(`${fr.label} - `, "")}</td>
                         <td>{fr.wallThickness} mm</td>
-                        <td>{w.grossArea.toFixed(2)}</td>
-                        <td>{w.netArea.toFixed(2)}</td>
+                        <td>{(w.grossArea * areaConv).toFixed(2)}</td>
+                        <td>{(w.netArea * areaConv).toFixed(2)}</td>
                         <td><strong>{w.panelCount.toFixed(3)}</strong></td>
                       </tr>
                     ))}
@@ -142,8 +144,8 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                       <tr key={`p-${pi}`}>
                         <td style={{ color: "var(--primary-light)" }}>{p.label}</td>
                         <td>{p.wallThickness || 80} mm</td>
-                        <td>{p.grossArea.toFixed(2)}</td>
-                        <td>{p.netArea.toFixed(2)}</td>
+                        <td>{(p.grossArea * areaConv).toFixed(2)}</td>
+                        <td>{(p.netArea * areaConv).toFixed(2)}</td>
                         <td><strong>{p.panelCount.toFixed(3)}</strong></td>
                       </tr>
                     ))}
@@ -151,8 +153,8 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                       <tr key={`rm-${ri}`}>
                         <td style={{ color: "var(--accent)" }}>🏠 {rm.label}</td>
                         <td>{rm.wallThickness || 80} mm</td>
-                        <td>{rm.totalArea.toFixed(2)}</td>
-                        <td>{rm.totalArea.toFixed(2)}</td>
+                        <td>{(rm.totalArea * areaConv).toFixed(2)}</td>
+                        <td>{(rm.totalArea * areaConv).toFixed(2)}</td>
                         <td><strong>{rm.totalPanels.toFixed(3)}</strong></td>
                       </tr>
                     ))}
@@ -160,8 +162,8 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                       <tr>
                         <td style={{ color: "var(--accent)" }}>🟠 Roof</td>
                         <td>{fr.floorRoofThickness || 100} mm</td>
-                        <td>{fr.roofArea.toFixed(2)}</td>
-                        <td>{fr.roofArea.toFixed(2)}</td>
+                        <td>{(fr.roofArea * areaConv).toFixed(2)}</td>
+                        <td>{(fr.roofArea * areaConv).toFixed(2)}</td>
                         <td><strong>{fr.roofPanelCount.toFixed(3)}</strong></td>
                       </tr>
                     )}
@@ -169,8 +171,8 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                       <tr>
                         <td style={{ color: "var(--accent)" }}>🔲 Floor Slab</td>
                         <td>{fr.floorSlabThickness || 100} mm</td>
-                        <td>{fr.slabArea.toFixed(2)}</td>
-                        <td>{fr.slabArea.toFixed(2)}</td>
+                        <td>{(fr.slabArea * areaConv).toFixed(2)}</td>
+                        <td>{(fr.slabArea * areaConv).toFixed(2)}</td>
                         <td><strong>{fr.slabPanelCount.toFixed(3)}</strong></td>
                       </tr>
                     )}
@@ -178,18 +180,18 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
                       <td><strong>Floor Totals</strong></td>
                       <td></td>
                       <td><strong>{(
-                        fr.wallRows.reduce((s,w) => s + w.grossArea, 0) +
+                        (fr.wallRows.reduce((s,w) => s + w.grossArea, 0) +
                         fr.partitionRows.reduce((s,p) => s + p.grossArea, 0) +
                         (fr.roomRows || []).reduce((s,r) => s + r.totalArea, 0) +
                         (fr.roofArea || 0) +
-                        (fr.slabArea || 0)
+                        (fr.slabArea || 0)) * areaConv
                       ).toFixed(2)}</strong></td>
                       <td><strong>{(
-                        fr.wallRows.reduce((s,w) => s + w.grossArea, 0) +
+                        (fr.wallRows.reduce((s,w) => s + w.grossArea, 0) +
                         fr.partitionRows.reduce((s,p) => s + p.grossArea, 0) +
                         (fr.roomRows || []).reduce((s,r) => s + r.totalArea, 0) +
                         (fr.roofArea || 0) +
-                        (fr.slabArea || 0)
+                        (fr.slabArea || 0)) * areaConv
                       ).toFixed(2)}</strong></td>
                       <td><strong>{(
                         fr.wallRows.reduce((s,w) => s + w.panelCount, 0) +
@@ -226,7 +228,7 @@ function QuoteModal({ open, onClose, config, calc, floors, unit, displayUnit, CO
             <table className="quote-table">
               <tbody>
                 <tr><td>Total PUF Panels Required</td><td><strong style={{ color: "var(--accent)", fontSize: "16px" }}>{calc.totalPanels.toFixed(3)} panels</strong></td></tr>
-                <tr><td>Total Panel Area</td><td><strong>{calc.totalArea.toFixed(2)} {au}</strong></td></tr>
+                <tr><td>Total Panel Area</td><td><strong>{(calc.totalArea * areaConv).toFixed(2)} {au}</strong></td></tr>
                 <tr><td>Number of Floors</td><td>{floorCount}</td></tr>
               </tbody>
             </table>
