@@ -1,28 +1,48 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "./firebase/firebase";
 
-const VALID_EMAIL = "info@essarfabgreenindia.com";
-const VALID_PASSWORD = "green@208006";
-const VALID_ADMIN_ID = "essarfab@9555";
+const VALID_ADMIN_ID = "efgi@208006";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [adminId, setAdminId] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
-    if (email !== VALID_EMAIL || password !== VALID_PASSWORD || adminId !== VALID_ADMIN_ID) {
-      setError("Invalid admin credentials. Please try again.");
-      return;
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      
+      if (adminId.trim() !== VALID_ADMIN_ID) {
+        setError("Invalid Admin User ID");
+        setLoading(false);
+        return;
+      }
+      
+      localStorage.setItem("isAdminAuthenticated", "true");
+      navigate("/admin-dashboard");
+    } catch (err) {
+      const code = err.code || "";
+      if (code === "auth/user-not-found" || code === "auth/wrong-password" || code === "auth/invalid-credential") {
+        setError("Invalid Email or Password");
+      } else if (code === "auth/invalid-email") {
+        setError("Invalid email format.");
+      } else if (code === "auth/network-request-failed") {
+        setError("Firebase Connection Error. Check your internet.");
+      } else {
+        setError("Access Denied. Please try again.");
+      }
+    } finally {
+      setLoading(false);
     }
-
-    localStorage.setItem("isAdminAuthenticated", "true");
-    navigate("/admin-dashboard");
   };
 
   return (
@@ -49,6 +69,7 @@ export default function AdminLogin() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@company.com"
             required
+            disabled={loading}
           />
         </label>
 
@@ -60,6 +81,7 @@ export default function AdminLogin() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter your password"
             required
+            disabled={loading}
           />
         </label>
 
@@ -71,11 +93,12 @@ export default function AdminLogin() {
             onChange={(e) => setAdminId(e.target.value)}
             placeholder="Enter admin user ID"
             required
+            disabled={loading}
           />
         </label>
 
-        <button type="submit" className="btn btn-primary full-width login-btn">
-          <i className="fas fa-shield-alt"></i> Admin Sign In
+        <button type="submit" className="btn btn-primary full-width login-btn" disabled={loading}>
+          <i className="fas fa-shield-alt"></i> {loading ? "Signing in..." : "Admin Sign In"}
         </button>
 
         <p className="login-hint">

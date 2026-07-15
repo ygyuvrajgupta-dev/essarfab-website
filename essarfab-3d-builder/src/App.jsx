@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, Fragment, useEffect } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Grid, Text } from "@react-three/drei";
@@ -13,6 +13,7 @@ import AdminLogin from "./AdminLogin";
 import AdminDashboard from "./AdminDashboard";
 import ProtectedRoute from "./ProtectedRoute";
 import DeviceHistory from "./DeviceHistory";
+import { onAuthChange, logout } from "./services/authService";
 import {
   layoutAlongWall,
   getPartitionLayouts,
@@ -381,7 +382,6 @@ function InternalRoom3D({ room, index, floorHeight, yOffset, unit, length, width
       const doorW = toM(parseFloat(item.width) || 0.9, unit);
       const doorH = toM(parseFloat(item.height) || 2.0, unit);
       const sill = item.type === "window" ? Math.min(1.0, Math.max(0.6, rh - doorH - 0.3)) : 0;
-      // Y at floor level - Door/Window components handle internal centering
       const yPos = 0;
       const insetVal = wallT / 2 + 0.015;
       let pos, rot;
@@ -541,7 +541,6 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
             layoutAlongWall(wallOpenings, span).forEach(({ item, offset }) => {
               const doorW = toM(parseFloat(item.width) || 0.9, unit);
               const doorH = toM(parseFloat(item.height) || 2.0, unit);
-              // Y at floor level - Door/Window components handle internal centering
               const yPos = 0;
               const insetV = wallT / 2 + 0.015;
               const worldX = x + offset * Math.cos(rad) + insetV * Math.sin(rad);
@@ -556,7 +555,6 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
             });
           });
 
-          // Cap partition visual height to match room walls when internal rooms exist
           const maxRoomHeight = (floor.internalRooms || []).reduce((max, r) => {
             const rh = Math.min(toM(parseFloat(r.roomHeight) || 2.4, unit), floorH);
             return Math.max(max, rh);
@@ -732,13 +730,24 @@ function RoomOpeningEditor({ openings, onAdd, onRemove, onUpdate, displayUnit, u
 export default function App() {
   const [step, setStep] = useState(1);
   const [unit, setUnit] = useState("m");
-  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem("isAuthenticated") === "true");
-
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const navigate = useNavigate();
-  const handleLogin = () => { setIsAuthenticated(true); navigate("/device-history"); };
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated");
-    setIsAuthenticated(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthChange((u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      console.error("Logout failed", err);
+    }
   };
 
   const [structureType, setStructureType] = useState("coldroom");
@@ -910,16 +919,27 @@ export default function App() {
   const partitionCount = floors.reduce((s, f) => s + (f.partitions || []).length, 0);
   const roomCount = floors.reduce((s, f) => s + (f.internalRooms || []).length, 0);
 
+  if (authLoading) {
+    return <div className="loading-screen">Loading...</div>;
+  }
+
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/admin-login" element={<AdminLogin />} />
+        <Route path="*" element={<Login />} />
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
-      <Route path="/login" element={<Login onLogin={handleLogin} />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/admin-login" element={<AdminLogin />} />
       <Route path="/admin-dashboard" element={<AdminDashboard />} />
-      {isAuthenticated ? (
-        <>
-          <Route path="/" element={<DeviceHistory />} />
-          <Route path="/device-history" element={<DeviceHistory />} />
-          <Route path="/builder" element={
+      <Route path="/device-history" element={<DeviceHistory />} />
+      <Route path="/" element={
         <ProtectedRoute>
           <div className="app-layout">
             <aside className="sidebar">
@@ -1451,12 +1471,8 @@ export default function App() {
 
             <button className="logout-btn" onClick={handleLogout} title="Logout">Logout</button>
           </div>
-          </ProtectedRoute>
-        } />
-        </>
-      ) : (
-        <Route path="*" element={<Login onLogin={handleLogin} />} />
-      )}
+        </ProtectedRoute>
+      } />
     </Routes>
   );
 }

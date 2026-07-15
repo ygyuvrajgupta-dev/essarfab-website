@@ -1,141 +1,135 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  getDeviceId,
-  getDeviceInfo,
-  loadDeviceHistory,
-  saveDeviceHistory,
-  loadUserNames,
-  saveUserNames,
-  upsertDevice,
-  removeDevice,
-  renameDevice,
-  formatTime,
-} from "./deviceUtils";
+import { onAuthChange } from "./services/authService";
+import { subscribeToDevices, renameDevice, removeDevice } from "./services/userService";
 
 export default function DeviceHistory() {
-  const navigate = useNavigate();
-  const [history, setHistory] = useState([]);
-  const [userNames, setUserNames] = useState({});
+  const [devices, setDevices] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const deviceId = getDeviceId();
-    const deviceInfo = getDeviceInfo();
-    const currentHistory = upsertDevice(loadDeviceHistory(), deviceId, deviceInfo);
-    saveDeviceHistory(currentHistory);
-    setHistory(currentHistory);
-    setUserNames(loadUserNames());
-  }, []);
+    const unsubscribe = onAuthChange((u) => {
+      setUser(u);
+      if (!u) {
+        navigate("/login");
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
 
-  const handleRemove = (deviceId) => {
-    const updated = removeDevice(history, deviceId);
-    saveDeviceHistory(updated);
-    setHistory(updated);
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = subscribeToDevices((list, error) => {
+      if (error) {
+        console.error("Device history error:", error);
+      }
+      setDevices(list);
+      setLoading(false);
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [user]);
+
+  const handleRename = async (deviceId) => {
+    if (!editName.trim()) return;
+    try {
+      await renameDevice(deviceId, editName.trim());
+      setEditingId(null);
+      setEditName("");
+    } catch (err) {
+      alert("Failed to rename device. Please try again.");
+    }
   };
 
-  const startRename = (deviceId, currentName) => {
-    setEditingId(deviceId);
-    setEditName(currentName || "");
+  const handleDelete = async (deviceId) => {
+    if (!window.confirm("Are you sure you want to remove this device?")) return;
+    try {
+      await removeDevice(deviceId);
+    } catch (err) {
+      alert("Failed to remove device. Please try again.");
+    }
   };
 
-  const saveRename = (deviceId) => {
-    const { updatedHistory, updatedNames } = renameDevice(history, userNames, deviceId, editName);
-    setHistory(updatedHistory);
-    setUserNames(updatedNames);
-    setEditingId(null);
-    setEditName("");
+  const formatDate = (isoString) => {
+    if (!isoString) return "Never";
+    const d = new Date(isoString);
+    return d.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
 
-  const openBuilder = () => {
-    navigate("/builder");
-  };
-
-  const getDisplayName = (device) => {
-    if (device.userName) return device.userName;
-    const customName = userNames[device.deviceId];
-    if (customName) return customName;
-    return "Unnamed Device";
-  };
-
-  const isCurrentDevice = (deviceId) => deviceId === getDeviceId();
+  if (!user) {
+    return <div className="loading-screen">Loading...</div>;
+  }
 
   return (
     <div className="device-history-page">
-      <div className="device-history-brand">
-        <div className="device-history-logo">
-          <img src="/Essarfab%20logo.png" alt="ESSARFAB GREEN INDIA" />
+      <div className="admin-header">
+        <div className="admin-brand">
+          <h1>Device History</h1>
+          <p>All devices that have accessed the 3D Builder</p>
         </div>
-        <h1>Device History</h1>
-        <p>Manage your authorized devices for the 3D Builder</p>
+        <button className="btn btn-outline" onClick={() => navigate("/")}>Back to Builder</button>
       </div>
 
-      <div className="device-history-content">
-        {history.length === 0 ? (
-          <div className="no-devices">
-            <i className="fas fa-desktop"></i>
-            <p>No devices registered yet.</p>
-          </div>
+      <div className="admin-content">
+        {loading ? (
+          <div className="empty-state">Loading devices...</div>
+        ) : devices.length === 0 ? (
+          <div className="empty-state">No devices found.</div>
         ) : (
-          <div className="device-cards">
-            {history.map((device) => (
-              <div
-                key={device.deviceId}
-                className={`device-card ${isCurrentDevice(device.deviceId) ? "current" : ""}`}
-              >
-                <div className="device-card-header">
-                  <div className="device-icon">
-                    <i className={`fas ${device.deviceType === "Mobile" ? "fa-mobile-alt" : device.deviceType === "Tablet" ? "fa-tablet-alt" : "fa-desktop"}`}></i>
+          <div className="user-list">
+            {devices.map((device, index) => (
+              <div key={device.id || device.deviceId || index} className="user-item">
+                {editingId === device.deviceId ? (
+                  <div className="user-edit-row">
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Device name"
+                      autoFocus
+                      style={{ flex: 1.5 }}
+                    />
+                    <button className="btn btn-primary btn-sm" onClick={() => handleRename(device.deviceId)}>Save</button>
+                    <button className="btn btn-outline btn-sm" onClick={() => { setEditingId(null); setEditName(""); }}>Cancel</button>
                   </div>
-                  <div className="device-info">
-                    {editingId === device.deviceId ? (
-                      <div className="rename-row">
-                        <input
-                          type="text"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          placeholder="Enter device name"
-                          autoFocus
-                        />
-                        <button className="btn-save" onClick={() => saveRename(device.deviceId)}>Save</button>
-                        <button className="btn-cancel" onClick={() => setEditingId(null)}>Cancel</button>
-                      </div>
-                    ) : (
-                      <div className="device-name-row">
-                        <h3>{getDisplayName(device)}</h3>
-                        {isCurrentDevice(device.deviceId) && <span className="current-badge">Current</span>}
-                      </div>
-                    )}
-                    <div className="device-meta">
-                      <span><i className="fas fa-globe"></i> {device.browser}</span>
-                      <span><i className="fas fa-tv"></i> {device.deviceType}</span>
+                ) : (
+                  <div className="user-display-row">
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span className="user-id-text">{device.deviceId}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        {device.userName || "Unnamed Device"}
+                        <span style={{ marginLeft: '8px' }}>· {device.deviceType || "Unknown"}</span>
+                        <span style={{ marginLeft: '8px' }}>· {device.browser || "Unknown"}</span>
+                        {device.os ? <span style={{ marginLeft: '8px' }}>· {device.os}</span> : ""}
+                      </span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        Last login: {formatDate(device.lastLogin)}
+                      </span>
                     </div>
-                    <div className="device-time">
-                      <i className="fas fa-clock"></i> Last login: {formatTime(device.lastLogin)}
+                    <div className="user-actions">
+                      <button className="btn btn-outline btn-sm" onClick={() => { setEditingId(device.deviceId); setEditName(device.userName || ""); }}>Rename</button>
+                      <button className="btn btn-remove btn-sm" onClick={() => handleDelete(device.deviceId)}>Delete</button>
                     </div>
                   </div>
-                </div>
-                <div className="device-card-actions">
-                  {editingId !== device.deviceId && (
-                    <button className="btn-rename" onClick={() => startRename(device.deviceId, getDisplayName(device))}>
-                      <i className="fas fa-pen"></i> Rename
-                    </button>
-                  )}
-                  <button className="btn-remove" onClick={() => handleRemove(device.deviceId)}>
-                    <i className="fas fa-minus"></i> Remove
-                  </button>
-                </div>
+                )}
               </div>
             ))}
           </div>
         )}
-      </div>
-
-      <div className="device-history-footer">
-        <button className="btn-open-builder" onClick={openBuilder}>
-          <i className="fas fa-cube"></i> Open 3D Builder
-        </button>
       </div>
     </div>
   );

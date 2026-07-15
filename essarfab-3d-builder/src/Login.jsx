@@ -1,55 +1,83 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { loginUser, onAuthChange, logout } from "./services/authService";
+import { verifyUserByEmail, upsertDevice } from "./services/userService";
 
-const VALID_EMAIL = "info@essarfabgreenindia.com";
-const VALID_PASSWORD = "green@208006";
-const STORAGE_KEY = "allowedUsers";
-
-export default function Login({ onLogin }) {
+export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [userId, setUserId] = useState("");
-  const [username, setUsername] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    const unsubscribe = onAuthChange((user) => {
+      if (user) {
+        navigate("/");
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
-    if (email !== VALID_EMAIL || password !== VALID_PASSWORD) {
-      setError("Invalid email or password. Please try again.");
-      return;
+    try {
+      await loginUser(email.trim(), password);
+      
+      const userData = await verifyUserByEmail(email.trim());
+      
+      await upsertDevice(userData.userId, {
+        deviceType: getDeviceType(),
+        browser: getBrowser(),
+      });
+      
+      navigate("/");
+    } catch (err) {
+      if (err.message === "User not found") {
+        setError("User not found. Please contact admin.");
+      } else if (err.message === "Account is inactive") {
+        setError("Your account is inactive. Contact admin.");
+      } else if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
+        setError("Invalid email or password.");
+      } else if (err.code === "auth/invalid-email") {
+        setError("Invalid email format.");
+      } else if (err.code === "auth/network-request-failed") {
+        setError("Firebase Connection Error. Check your internet.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const allowedUsers = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    const user = allowedUsers.find(u => u.userId === userId.trim());
-    
-    if (!user) {
-      setError("sorry bhai!😂. User ID not found.");
-      return;
-    }
+  const getDeviceType = () => {
+    const ua = navigator.userAgent;
+    if (/tablet|ipad|playbook|silk/i.test(ua)) return "Tablet";
+    if (/mobile|android|iphone|ipod|blackberry|opera mini|iemobile|wpdesktop/i.test(ua)) return "Mobile";
+    return "Desktop";
+  };
 
-    if (user.username !== username.trim()) {
-      setError("sorry bhai!😂. Username does not match.");
-      return;
-    }
-
-    localStorage.setItem("isAuthenticated", "true");
-    localStorage.setItem("currentUser", JSON.stringify(user));
-    onLogin();
+  const getBrowser = () => {
+    const ua = navigator.userAgent;
+    if (ua.includes("Edg/")) return "Edge";
+    if (ua.includes("Chrome/")) return "Chrome";
+    if (ua.includes("Safari/") && !ua.includes("Chrome")) return "Safari";
+    if (ua.includes("Firefox/")) return "Firefox";
+    return "Unknown";
   };
 
   return (
     <div className="login-page">
-      <button className="admin-panel-btn" onClick={() => navigate("/admin-login")}>Admin Panel</button>
-
       <div className="login-brand">
         <div className="login-logo">
           <img src="/Essarfab%20logo.png" alt="ESSARFAB GREEN INDIA" />
         </div>
         <h1 className="login-brand-name">ESSARFAB GREEN INDIA</h1>
-        <p className="login-brand-tagline">PUF Panel Calculator & 3D Builder</p>
+        <p className="login-brand-tagline">3D Panel Builder</p>
       </div>
 
       <form className="login-form" onSubmit={handleSubmit}>
@@ -59,13 +87,14 @@ export default function Login({ onLogin }) {
         {error && <div className="login-error-box"><span className="login-error-icon">⚠️</span> {error}</div>}
 
         <label>
-          <span className="label-text">Email Address</span>
+          <span className="label-text">Email</span>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@company.com"
             required
+            disabled={loading}
           />
         </label>
 
@@ -77,37 +106,16 @@ export default function Login({ onLogin }) {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter your password"
             required
+            disabled={loading}
           />
         </label>
 
-        <label>
-          <span className="label-text">User ID</span>
-          <input
-            type="text"
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            placeholder="Enter your user ID"
-            required
-          />
-        </label>
-
-        <label>
-          <span className="label-text">Username</span>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Enter your username"
-            required
-          />
-        </label>
-
-        <button type="submit" className="btn btn-primary full-width login-btn">
-          <i className="fas fa-sign-in-alt"></i> Sign In
+        <button type="submit" className="btn btn-primary full-width login-btn" disabled={loading}>
+          <i className="fas fa-sign-in-alt"></i> {loading ? "Signing in..." : "Sign In"}
         </button>
 
         <p className="login-hint">
-          Authorized personnel only. Contact <a href="mailto:info@essarfabgreenindia.com">admin</a> for access.
+          <a href="/admin-login">Admin Login →</a>
         </p>
       </form>
 
