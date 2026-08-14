@@ -145,6 +145,7 @@ function createDefaultFloor(id, unit, index = 0) {
         width: unit === "ft" ? "4.0" : "1.2",
         height: unit === "ft" ? "7.0" : "2.1",
         label: "Main Door",
+        posX: "", posY: "",
       },
     ],
     roofType: "sandwich",
@@ -175,6 +176,7 @@ function createDefaultRoom(id, unit) {
         width: unit === "ft" ? "3.0" : "0.9",
         height: unit === "ft" ? "6.5" : "2.0",
         label: "Room Door",
+        posX: "", posY: "",
       },
     ],
   };
@@ -378,11 +380,15 @@ function InternalRoom3D({ room, index, floorHeight, yOffset, unit, length, width
 
   Object.entries(grouped).forEach(([wallId, wallOpenings]) => {
     const span = wallSpans[wallId] ?? rl;
-    layoutAlongWall(wallOpenings, span).forEach(({ item, offset }) => {
+    layoutAlongWall(wallOpenings, span, unit).forEach(({ item, offset }) => {
       const doorW = toM(parseFloat(item.width) || 0.9, unit);
       const doorH = toM(parseFloat(item.height) || 2.0, unit);
-      const sill = item.type === "window" ? Math.min(1.0, Math.max(0.6, rh - doorH - 0.3)) : 0;
-      const yPos = 0;
+      const hasPosY = item.posY !== undefined && item.posY !== "" && !isNaN(parseFloat(item.posY));
+      const manualY = hasPosY ? toM(parseFloat(item.posY), unit) : 0;
+      const sill = item.type === "window"
+        ? (hasPosY ? manualY : Math.min(1.0, Math.max(0.6, rh - doorH - 0.3)))
+        : 0;
+      const yPos = item.type === "door" ? manualY : 0;
       const insetVal = wallT / 2 + 0.015;
       let pos, rot;
 
@@ -462,7 +468,7 @@ function InternalRoom3D({ room, index, floorHeight, yOffset, unit, length, width
 }
 
 // ─── 3D Scene ─────────────────────────────────────────────────────────────────
-function Scene({ length, width, floors, showRoof, unit, panelType }) {
+function Scene({ length, width, floors, showRoof, unit, panelType, onWallClick, selectedWallIds = new Set() }) {
   const floorHeights = floors.map(f => toM(parseFloat(f.height) || 4, unit));
   const totalBuildingHeight = floorHeights.reduce((a, b) => a + b, 0);
   const allDoors = floors.reduce((s, f) =>
@@ -503,7 +509,7 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
 
     Object.entries(grouped).forEach(([wallId, wallOpenings]) => {
       const span = wallSpans[wallId] ?? length;
-      layoutAlongWall(wallOpenings, span).forEach(({ item, offset }) => {
+      layoutAlongWall(wallOpenings, span, unit).forEach(({ item, offset }) => {
         const layout = partitionMap[`floor${fi}_${wallId}`];
         const transform = getOpeningTransform(item, layout, { length, width, thickness: wallT, offset, unit });
         if (transform) {
@@ -525,10 +531,10 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
 
         {showWalls && (
           <>
-            <Panel position={[0, yOffset + floorH / 2, width / 2]} size={[length, floorH, wallT]} color={color} panelWidth={pw} />
-            <Panel position={[0, yOffset + floorH / 2, -width / 2]} rotation={[0, Math.PI, 0]} size={[length, floorH, wallT]} color={color} panelWidth={pw} />
-            <Panel position={[-length / 2, yOffset + floorH / 2, 0]} rotation={[0, -Math.PI / 2, 0]} size={[width, floorH, wallT]} color={color} panelWidth={pw} />
-            <Panel position={[length / 2, yOffset + floorH / 2, 0]} rotation={[0, Math.PI / 2, 0]} size={[width, floorH, wallT]} color={color} panelWidth={pw} />
+            <Panel wallId={`fw_${fi}_0`} position={[0, yOffset + floorH / 2, width / 2]} size={[length, floorH, wallT]} color={color} panelWidth={pw} onClick={onWallClick} isSelected={selectedWallIds.has(`fw_${fi}_0`)} />
+            <Panel wallId={`fw_${fi}_1`} position={[0, yOffset + floorH / 2, -width / 2]} rotation={[0, Math.PI, 0]} size={[length, floorH, wallT]} color={color} panelWidth={pw} onClick={onWallClick} isSelected={selectedWallIds.has(`fw_${fi}_1`)} />
+            <Panel wallId={`fw_${fi}_2`} position={[-length / 2, yOffset + floorH / 2, 0]} rotation={[0, -Math.PI / 2, 0]} size={[width, floorH, wallT]} color={color} panelWidth={pw} onClick={onWallClick} isSelected={selectedWallIds.has(`fw_${fi}_2`)} />
+            <Panel wallId={`fw_${fi}_3`} position={[length / 2, yOffset + floorH / 2, 0]} rotation={[0, Math.PI / 2, 0]} size={[width, floorH, wallT]} color={color} panelWidth={pw} onClick={onWallClick} isSelected={selectedWallIds.has(`fw_${fi}_3`)} />
           </>
         )}
 
@@ -538,10 +544,12 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
           const groupedPart = groupOpeningsByWall(partOpenings);
           Object.entries(groupedPart).forEach(([wallId, wallOpenings]) => {
             const span = wallLen;
-            layoutAlongWall(wallOpenings, span).forEach(({ item, offset }) => {
+            layoutAlongWall(wallOpenings, span, unit).forEach(({ item, offset }) => {
               const doorW = toM(parseFloat(item.width) || 0.9, unit);
               const doorH = toM(parseFloat(item.height) || 2.0, unit);
-              const yPos = 0;
+              const hasPosY = item.posY !== undefined && item.posY !== "" && !isNaN(parseFloat(item.posY));
+              const yPos = hasPosY ? toM(parseFloat(item.posY), unit) : 0;
+              const sill = item.type === "window" ? (hasPosY ? yPos : 0.6) : 0;
               const insetV = wallT / 2 + 0.015;
               const worldX = x + offset * Math.cos(rad) + insetV * Math.sin(rad);
               const worldZ = z + offset * Math.sin(rad) + insetV * Math.cos(rad);
@@ -551,6 +559,7 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
                 rotation: [0, rad, 0],
                 width: doorW,
                 height: doorH,
+                sill,
               });
             });
           });
@@ -563,12 +572,12 @@ function Scene({ length, width, floors, showRoof, unit, panelType }) {
 
           return (
             <Fragment key={partition.id ?? index}>
-              <Panel position={[x, yOffset + effectiveH / 2, z]} rotation={[0, rad, 0]} size={[wallLen, effectiveH, wallT]} color="#dce8e0" panelWidth={pw} />
-              {placedPartOpenings.map(({ opening, position, rotation, width: w, height: h }, oi) =>
+              <Panel wallId={`part_${fi}_${partition.id ?? index}`} position={[x, yOffset + effectiveH / 2, z]} rotation={[0, rad, 0]} size={[wallLen, effectiveH, wallT]} color="#dce8e0" panelWidth={pw} onClick={onWallClick} isSelected={selectedWallIds.has(`part_${fi}_${partition.id ?? index}`)} />
+              {placedPartOpenings.map(({ opening, position, rotation, width: w, height: h, sill }, oi) =>
                 opening.type === "door" ? (
                   <Door key={opening.id ?? `pd-${index}-${oi}`} position={position} rotation={rotation} doorWidth={w} doorHeight={h} color="#dce8e0" thickness={wallT} />
                 ) : (
-                  <Window key={opening.id ?? `pw-${index}-${oi}`} position={position} rotation={rotation} windowWidth={w} windowHeight={h} sillHeight={0.6} thickness={wallT} />
+                  <Window key={opening.id ?? `pw-${index}-${oi}`} position={position} rotation={rotation} windowWidth={w} windowHeight={h} sillHeight={sill} thickness={wallT} />
                 )
               )}
               <Text position={[x, yOffset + wallH + 0.35, z]} fontSize={0.28} color="#3ec47e"
@@ -717,6 +726,10 @@ function RoomOpeningEditor({ openings, onAdd, onRemove, onUpdate, displayUnit, u
               value={o.width} onChange={e => onUpdate(o.id, "width", e.target.value)} placeholder={`W (${displayUnit})`} />
             <input type="number" min={0.3} max={unit === "ft" ? 8 : 2.5} step={0.1}
               value={o.height} onChange={e => onUpdate(o.id, "height", e.target.value)} placeholder={`H (${displayUnit})`} />
+            <input type="number" step={0.1}
+              value={o.posX ?? ""} onChange={e => onUpdate(o.id, "posX", e.target.value)} placeholder={`X (${displayUnit})`} />
+            <input type="number" step={0.1}
+              value={o.posY ?? ""} onChange={e => onUpdate(o.id, "posY", e.target.value)} placeholder={`Y (${displayUnit})`} />
             <input type="text" value={o.label} onChange={e => onUpdate(o.id, "label", e.target.value)} placeholder="Label" className="room-label-input" />
           </div>
         </div>
@@ -732,6 +745,8 @@ export default function App() {
   const [unit, setUnit] = useState("m");
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [selectedWallIds, setSelectedWallIds] = useState(() => new Set());
+  const [selectedWallCount, setSelectedWallCount] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -756,6 +771,60 @@ export default function App() {
 
   const [floors, setFloors] = useState(() => [createDefaultFloor(Date.now(), "m", 0)]);
   const [currentFloorId, setCurrentFloorId] = useState(() => floors[0]?.id);
+
+  // ── Wall selection helpers (must be after setFloors) ─────────────────────
+  const toggleWallSelection = (wallId) => {
+    setSelectedWallIds(prev => {
+      const next = new Set(prev);
+      next.has(wallId) ? next.delete(wallId) : next.add(wallId);
+      setSelectedWallCount(next.size);
+      return next;
+    });
+  };
+
+  const clearWallSelection = () => {
+    setSelectedWallIds(() => new Set());
+    setSelectedWallCount(0);
+  };
+
+  const deleteSelectedWalls = () => {
+    if (selectedWallCount === 0) return;
+    const msg = selectedWallCount === 1 ? "Delete this wall?" : `Delete ${selectedWallCount} selected walls?`;
+    if (!window.confirm(msg + "\n\nThis will remove them from the model.")) return;
+
+    const selected = selectedWallIds;
+    console.log("DEL - selected:", [...selected]);
+    console.log("DEL - floors:", floors.map(f => ({ id: f.id, parts: (f.partitions||[]).map(p => `part_${floors.indexOf(f)}_${p.id}`) })));
+
+    setFloors(prev => {
+      const out = prev.map(f => {
+        const fi = prev.indexOf(f);
+        const before = (f.partitions || []).length;
+        const kept = (f.partitions || []).filter(p => {
+          const wid = `part_${fi}_${p.id}`;
+          const keep = !selected.has(wid);
+          if (!keep) console.log("DEL - removing:", wid);
+          return keep;
+        });
+        console.log(`DEL - floor ${fi}: ${before} -> ${kept.length}`);
+        return { ...f, partitions: kept };
+      });
+      return out;
+    });
+    clearWallSelection();
+  };
+
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedWallCount > 0 && document.activeElement?.tagName !== "INPUT") {
+        e.preventDefault();
+        deleteSelectedWalls();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectedWallCount]);
+  // ── End wall selection helpers ────────────────────────────────────────────
 
   const [panelType, setPanelType] = useState("both");
   const [showRoof, setShowRoof] = useState(true);
@@ -817,7 +886,7 @@ export default function App() {
     const dw = unit === "ft" ? "3.0" : "0.9";
     const dh = unit === "ft" ? "6.5" : "2.0";
     updateFloor(currentFloorId, "partitions", currentPartitions.map(p =>
-      p.id === partId ? { ...p, openings: [...(p.openings || []), { id: Date.now(), type: "door", wall: "partition_side", width: dw, height: dh, label: `Door ${(p.openings || []).length + 1}` }] } : p
+      p.id === partId ? { ...p, openings: [...(p.openings || []), { id: Date.now(), type: "door", wall: "partition_side", width: dw, height: dh, label: `Door ${(p.openings || []).length + 1}`, posX: "", posY: "" }] } : p
     ));
   };
 
@@ -836,7 +905,7 @@ export default function App() {
   const addOpening = () => {
     const dw = unit === "ft" ? "4.0" : "1.2";
     const dh = unit === "ft" ? "7.0" : "2.1";
-    updateFloor(currentFloorId, "openings", [...currentOpenings, { id: Date.now(), type: "door", wall: "front", width: dw, height: dh, label: "Opening" }]);
+    updateFloor(currentFloorId, "openings", [...currentOpenings, { id: Date.now(), type: "door", wall: "front", width: dw, height: dh, label: "Opening", posX: "", posY: "" }]);
   };
 
   const removeOpening = id => updateFloor(currentFloorId, "openings", currentOpenings.filter(x => x.id !== id));
@@ -862,7 +931,7 @@ export default function App() {
     if (!currentEditingRoom) return;
     const dw = unit === "ft" ? "3.0" : "0.9";
     const dh = unit === "ft" ? "6.5" : "2.0";
-    updateRoom(editingRoomId, "openings", [...(currentEditingRoom.openings || []), { id: Date.now(), type: "door", wall: "front", width: dw, height: dh, label: "Room Door" }]);
+    updateRoom(editingRoomId, "openings", [...(currentEditingRoom.openings || []), { id: Date.now(), type: "door", wall: "front", width: dw, height: dh, label: "Room Door", posX: "", posY: "" }]);
   };
 
   const removeRoomOpening = (opId) => {
@@ -886,8 +955,8 @@ export default function App() {
       setFloors(prev => prev.map(f => ({
         ...f,
         height: String(fromM(parseFloat(f.height) || 0, newUnit)),
-        partitions: (f.partitions || []).map(p => ({ ...p, length: String(fromM(parseFloat(p.length) || 0, newUnit)), height: String(fromM(parseFloat(p.height) || 0, newUnit)) })),
-        openings: (f.openings || []).map(o => ({ ...o, width: String(fromM(parseFloat(o.width) || 0, newUnit)), height: String(fromM(parseFloat(o.height) || 0, newUnit)) })),
+        partitions: (f.partitions || []).map(p => ({ ...p, length: String(fromM(parseFloat(p.length) || 0, newUnit)), height: String(fromM(parseFloat(p.height) || 0, newUnit)), openings: (p.openings || []).map(o => ({ ...o, width: String(fromM(parseFloat(o.width) || 0, newUnit)), height: String(fromM(parseFloat(o.height) || 0, newUnit)), posX: o.posX !== undefined && o.posX !== "" ? String(fromM(parseFloat(o.posX) || 0, newUnit)) : o.posX, posY: o.posY !== undefined && o.posY !== "" ? String(fromM(parseFloat(o.posY) || 0, newUnit)) : o.posY })) })),
+        openings: (f.openings || []).map(o => ({ ...o, width: String(fromM(parseFloat(o.width) || 0, newUnit)), height: String(fromM(parseFloat(o.height) || 0, newUnit)), posX: o.posX !== undefined && o.posX !== "" ? String(fromM(parseFloat(o.posX) || 0, newUnit)) : o.posX, posY: o.posY !== undefined && o.posY !== "" ? String(fromM(parseFloat(o.posY) || 0, newUnit)) : o.posY })),
         internalRooms: (f.internalRooms || []).map(r => ({
           ...r,
           positionX: String(fromM(parseFloat(r.positionX) || 0, newUnit)),
@@ -895,7 +964,7 @@ export default function App() {
           roomLength: String(fromM(parseFloat(r.roomLength) || 3, newUnit)),
           roomWidth: String(fromM(parseFloat(r.roomWidth) || 2.5, newUnit)),
           roomHeight: String(fromM(parseFloat(r.roomHeight) || 2.4, newUnit)),
-          openings: (r.openings || []).map(o => ({ ...o, width: String(fromM(parseFloat(o.width) || 0, newUnit)), height: String(fromM(parseFloat(o.height) || 0, newUnit)) })),
+          openings: (r.openings || []).map(o => ({ ...o, width: String(fromM(parseFloat(o.width) || 0, newUnit)), height: String(fromM(parseFloat(o.height) || 0, newUnit)), posX: o.posX !== undefined && o.posX !== "" ? String(fromM(parseFloat(o.posX) || 0, newUnit)) : o.posX, posY: o.posY !== undefined && o.posY !== "" ? String(fromM(parseFloat(o.posY) || 0, newUnit)) : o.posY })),
         })),
         roofPanelHeightMM: f.roofPanelHeightMM ? Math.round(fromM(parseFloat(f.roofPanelHeightMM) / 1000, newUnit) * 1000) : undefined,
       })));
@@ -1112,6 +1181,8 @@ export default function App() {
                               </select>
                               <input type="number" min={0.3} max={unit === "ft" ? 8 : 2.5} step={0.1} value={op.width} onChange={e => updatePartitionOpening(p.id, op.id, "width", e.target.value)} placeholder={`W (${displayUnit})`} />
                               <input type="number" min={0.3} max={unit === "ft" ? 8 : 2.5} step={0.1} value={op.height} onChange={e => updatePartitionOpening(p.id, op.id, "height", e.target.value)} placeholder={`H (${displayUnit})`} />
+                              <input type="number" step={0.1} value={op.posX ?? ""} onChange={e => updatePartitionOpening(p.id, op.id, "posX", e.target.value)} placeholder={`X (${displayUnit})`} />
+                              <input type="number" step={0.1} value={op.posY ?? ""} onChange={e => updatePartitionOpening(p.id, op.id, "posY", e.target.value)} placeholder={`Y (${displayUnit})`} />
                               <input type="text" value={op.label} onChange={e => updatePartitionOpening(p.id, op.id, "label", e.target.value)} placeholder="Label" />
                             </div>
                           </div>
@@ -1229,6 +1300,8 @@ export default function App() {
                           </select></label>
                           <label>Width ({displayUnit}) <input type="number" min={1} max={unit === "ft" ? 16 : 5} step={0.1} value={o.width} onChange={e => updateOpening(o.id, "width", e.target.value)} /></label>
                           <label>Height ({displayUnit}) <input type="number" min={1} max={unit === "ft" ? 16 : 5} step={0.1} value={o.height} onChange={e => updateOpening(o.id, "height", e.target.value)} /></label>
+                          <label>Pos X ({displayUnit}) <input type="number" step={0.1} value={o.posX ?? ""} placeholder="Auto" onChange={e => updateOpening(o.id, "posX", e.target.value)} /></label>
+                          <label>Pos Y ({displayUnit}) <input type="number" step={0.1} value={o.posY ?? ""} placeholder="Auto" onChange={e => updateOpening(o.id, "posY", e.target.value)} /></label>
                         </div>
                       </div>
                     ))}
@@ -1439,19 +1512,30 @@ export default function App() {
             </aside>
 
             <main className="canvas-area">
-              <div className="canvas-stats" aria-live="polite">
+              <div className="canvas-stats" style={{display:"flex",gap:"8px",alignItems:"center",flexWrap:"wrap"}}>
                 <span className="stat-chip floors"><strong>{floors.length}</strong> Floor{floors.length !== 1 ? "s" : ""}</span>
                 <span className="stat-chip rooms"><strong>{roomCount}</strong> Room{roomCount !== 1 ? "s" : ""}</span>
                 <span className="stat-chip partitions"><strong>{partitionCount}</strong> Partition{partitionCount !== 1 ? "s" : ""}</span>
                 <span className="stat-chip doors"><strong>{doorCount}</strong> Door{doorCount !== 1 ? "s" : ""}</span>
                 <span className="stat-chip windows"><strong>{windowCount}</strong> Window{windowCount !== 1 ? "s" : ""}</span>
+                {selectedWallCount > 0 && (
+                  <span className="stat-chip" style={{background:"rgba(245,166,35,0.2)",color:"#f5a623",border:"1px solid #f5a623"}}>
+                    <strong>{selectedWallCount}</strong> selected
+                    <button onClick={clearWallSelection} style={{marginLeft:"6px",background:"none",border:"none",color:"#f5a623",cursor:"pointer",fontSize:"14px"}} title="Clear selection">✕</button>
+                  </span>
+                )}
               </div>
 
               <Canvas shadows camera={{ position: [lengthM * 1.6, totalHeightM * 1.2 + 4, widthM * 2 + 4], fov: 45 }} gl={{ antialias: true }}>
-                <Scene length={lengthM} width={widthM} floors={floors} showRoof={showRoof} unit={unit} panelType={panelType} />
+                <Scene length={lengthM} width={widthM} floors={floors} showRoof={showRoof} unit={unit} panelType={panelType} onWallClick={toggleWallSelection} selectedWallIds={selectedWallIds} />
               </Canvas>
 
-              <div className="canvas-hint">🖱️ Drag to orbit · Scroll to zoom · Right-click to pan</div>
+              <div className="canvas-hint">🖱️ Drag to orbit · Scroll to zoom · Right-click to pan · Click wall to select · Delete key to remove</div>
+              {selectedWallCount > 0 && (
+                <div className="canvas-hint" style={{background:"rgba(245,166,35,0.15)",border:"1px solid rgba(245,166,35,0.4)",color:"#f5a623",marginTop:"2px"}}>
+                  <strong>{selectedWallCount}</strong> wall{selectedWallCount > 1 ? "s" : ""} selected — Press <kbd style={{background:"rgba(245,166,35,0.2)",padding:"1px 6px",borderRadius:"3px",border:"1px solid rgba(245,166,35,0.4)"}}>Delete</kbd> or <kbd style={{background:"rgba(245,166,35,0.2)",padding:"1px 6px",borderRadius:"3px",border:"1px solid rgba(245,166,35,0.4)"}}>Backspace</kbd> to remove
+                </div>
+              )}
             </main>
 
             <QuoteModal

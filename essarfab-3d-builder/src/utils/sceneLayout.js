@@ -1,11 +1,14 @@
 /** Spread openings evenly along a wall span. */
-export function layoutAlongWall(items, span) {
+export function layoutAlongWall(items, span, unit = "m") {
   if (!items.length) return [];
   const step = span / (items.length + 1);
-  return items.map((item, i) => ({
-    item,
-    offset: -span / 2 + step * (i + 1),
-  }));
+  return items.map((item, i) => {
+    const manualX = parseFloat(item.posX);
+    const offset = item.posX !== undefined && item.posX !== "" && !isNaN(manualX)
+      ? toM(manualX, unit)
+      : -span / 2 + step * (i + 1);
+    return { item, offset };
+  });
 }
 
 const FT_PER_M = 3.28084;
@@ -70,9 +73,13 @@ export function getPartitionLayouts(partitions, length, width, height, unit) {
 export function getOpeningTransform(opening, layout, { length, width, thickness, offset, unit }) {
   const doorW = toM(parseFloat(opening.width) || 1.2, unit);
   const doorH = toM(parseFloat(opening.height) || (opening.type === "door" ? 2.1 : 1.0), unit);
-  const sill = opening.type === "window" ? Math.min(1.0, Math.max(0.6, (layout?.wallH || 4) - doorH - 0.3)) : 0;
-  // Y is floor-level: Door/Window components handle internal centering
-  const y = 0;
+  // Manual Y position: sill height for windows, bottom offset for doors
+  const hasPosY = opening.posY !== undefined && opening.posY !== "" && !isNaN(parseFloat(opening.posY));
+  const manualY = hasPosY ? toM(parseFloat(opening.posY), unit) : 0;
+  const sill = opening.type === "window"
+    ? (hasPosY ? manualY : Math.min(1.0, Math.max(0.6, (layout?.wallH || 4) - doorH - 0.3)))
+    : 0;
+  const y = opening.type === "door" ? manualY : 0;
   const inset = thickness / 2 + 0.02;
 
   const wall = opening.wall;
